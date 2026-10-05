@@ -47,17 +47,4 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             set -e
-
-            DEPLOY_PATH="/var/www/paperlighttech/cave/CAVE-INTERNAL-FRONTEND"
-            TMP_PATH="/tmp/cave-frontend-deploy/dist"
-
-            rm -rf "${DEPLOY_PATH}/dist.new"
-            mv "$TMP_PATH" "${DEPLOY_PATH}/dist.new"
-
-            rm -rf "${DEPLOY_PATH}/dist"
-            mv "${DEPLOY_PATH}/dist.new" "${DEPLOY_PATH}/dist"
-
-            sudo nginx -t
-            sudo systemctl reload nginx
-
-            echo "CAVE frontend deployed successfully"
+            /usr/local/bin/deploy-cave-frontend
