@@ -1,3 +1,4 @@
+import { EmptyNote } from "../../components/ui"
 import { useState } from "react"
 import { Badge, SectionLabel, Button } from "../../components/ui"
 import { formatAmount } from "../../lib/format"
@@ -80,6 +81,9 @@ export default function Commission({ onNav, navTab }: Props) {
 
         <div className="px-5 py-4 flex flex-col gap-3">
           <SectionLabel>Staff Payouts</SectionLabel>
+          {stylists.length === 0 && (
+            <EmptyNote>No staff to pay out yet. Add staff from the admin dashboard.</EmptyNote>
+          )}
           {stylists.map((s) => (
             <div
               key={s.id}

@@ -1,3 +1,4 @@
+import { EmptyNote } from "../../components/ui"
 import { SectionLabel } from "../../components/ui"
 import { ManagerNav } from "../../components/layout"
 import { formatAmount, formatDuration } from "../../lib/format"
@@ -163,6 +164,9 @@ export default function ManagerHome({
         <div className="px-5 pb-5">
           <SectionLabel>Active Now ({activeSessions.length})</SectionLabel>
           <div className="flex flex-col gap-2.5">
+            {activeSessions.length === 0 && (
+              <EmptyNote>No active sessions right now.</EmptyNote>
+            )}
             {activeSessions.map((session) => {
               const stylist = getStylist(session.stylistId)
               return (
@@ -223,6 +227,9 @@ export default function ManagerHome({
         <div className="px-5 pb-5">
           <SectionLabel>Staff Status</SectionLabel>
           <div className="flex flex-col gap-0">
+            {stylists.length === 0 && (
+              <EmptyNote>No staff have been added to this branch yet.</EmptyNote>
+            )}
             {stylists.map((s, i) => (
               <div
                 key={s.id}

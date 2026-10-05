@@ -1,3 +1,4 @@
+import { EmptyNote } from "../../../components/ui"
 import { useEffect, useState } from "react"
 import {
   Plus,
@@ -186,6 +187,9 @@ export const PricingView = () => {
               </button>
             </div>
             <div className="flex flex-col">
+              {items.length === 0 && (
+                <EmptyNote>No services are priced for this branch yet.</EmptyNote>
+              )}
               {items.slice(0, limit).map((row, index) => (
                 <div key={row.pricingId} className="pricing-row">
                   <span className="pricing-row-number">

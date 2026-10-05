@@ -5,6 +5,8 @@ import { Check, ChevronDown } from "lucide-react"
 export interface SelectOption {
   value: string
   label: string
+  /** Compact text for the closed trigger (e.g. just "%"); the open menu still shows `label`. */
+  shortLabel?: string
 }
 
 interface SelectProps {
@@ -167,7 +169,7 @@ export function Select({
       >
         {leading && <span className="select-leading">{leading}</span>}
         <span className={`select-value ${selected ? "" : "select-placeholder"}`}>
-          {selected?.label ?? placeholder}
+          {selected?.shortLabel ?? selected?.label ?? placeholder}
         </span>
         <ChevronDown
           size={14}

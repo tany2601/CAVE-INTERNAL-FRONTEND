@@ -1,3 +1,4 @@
+import { EmptyNote } from "../../../components/ui"
 import { useState } from "react"
 import {
   ArrowLeft,
@@ -100,12 +101,12 @@ export function MonthlyView() {
           rows={data ? [...data.branches.map(moneyRow), moneyRow(data.total)] : []}
         />
       </AdminCard>
-      <AdminCard className="p-4 sm:p-5">
+      <AdminCard className="p-3 sm:p-5">
         <CardHeader
           title="Calendar"
           meta={`${monthName} ${year} · tap a revenue day`}
         />
-        <div className="grid grid-cols-7 gap-1 sm:gap-2 mt-5">
+        <div className="grid grid-cols-[repeat(7,minmax(0,1fr))] gap-1 sm:gap-2 mt-5">
           {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
             <div key={day} className="text-center text-[8px] sm:text-[9px] uppercase tracking-wider text-[var(--text-muted)] py-2">
               {day}
@@ -120,14 +121,14 @@ export function MonthlyView() {
             return (
               <button
                 key={day}
-                className={`aspect-square min-h-11 rounded-lg border flex flex-col items-center justify-center ${
+                className={`aspect-square w-full min-w-0 sm:min-h-11 rounded-md sm:rounded-lg border flex flex-col items-center justify-center text-sm ${
                   revenue
                     ? "border-[var(--text-muted)] bg-[var(--elevated)]"
                     : "border-[var(--border-subtle)] bg-[var(--surface)]"
                 } ${item.date === data?.today ? "ring-1 ring-[#4CAF86]" : ""}`}
                 onClick={() => revenue && setSelectedDay(day)}
               >
-                <span className="font-display font-700">{day}</span>
+                <span className="font-display font-700 text-[13px] sm:text-base leading-none">{day}</span>
                 {revenue > 0 && (
                   <span className="hidden sm:block text-[8px] text-[var(--text-muted)] mt-1">
                     {formatMoney(revenue)}
@@ -137,6 +138,9 @@ export function MonthlyView() {
             )
           })}
         </div>
+        {data && days.every((item) => !item.revenue) && (
+          <EmptyNote className="mt-4">No revenue recorded in {monthName} yet.</EmptyNote>
+        )}
         <div className="flex items-center gap-4 text-[9px] text-[var(--text-muted)] mt-4">
           <span className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-[var(--text)]" /> Has revenue

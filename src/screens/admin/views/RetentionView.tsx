@@ -1,3 +1,4 @@
+import { EmptyNote } from "../../../components/ui"
 import { useState } from "react"
 import {
   Repeat2,
@@ -87,6 +88,9 @@ export const RetentionView = () => {
             <Repeat2 size={20} className="text-[var(--text-muted)]" />
           </div>
           <div className="retention-leaderboard mt-4">
+            {data && retentionCustomers.length === 0 && (
+              <EmptyNote>No returning customers yet.</EmptyNote>
+            )}
             {retentionCustomers.slice(0, limit).map((customer, index) => (
               <article key={customer[0]}>
                 <div className="retention-position">

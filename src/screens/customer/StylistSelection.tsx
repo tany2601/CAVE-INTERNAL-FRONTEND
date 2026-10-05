@@ -13,10 +13,10 @@ interface Props {
 
 // Cinematic barber photos from Unsplash
 const STYLIST_PHOTOS: string[] = [
-  "https://images.unsplash.com/photo-1622286342621-4bd786c2447c?w=400&h=400&fit=crop&auto=format&q=80",
-  "https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=400&h=400&fit=crop&auto=format&q=80",
-  "https://images.unsplash.com/photo-1599351431202-1e0f0137899a?w=400&h=400&fit=crop&auto=format&q=80",
-  "https://images.unsplash.com/photo-1621605815971-fbc98d665033?w=400&h=400&fit=crop&auto=format&q=80",
+  "/images/photos/1622286342621-4bd786c2447c.jpg",
+  "/images/photos/1503951914875-452162b0f3f1.jpg",
+  "/images/photos/1599351431202-1e0f0137899a.jpg",
+  "/images/photos/1621605815971-fbc98d665033.jpg",
 ]
 
 export default function StylistSelection({

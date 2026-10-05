@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Logo } from "../../components/ui"
 import { Delete } from "lucide-react"
 import { useAuth } from "../../context/AuthContext"
@@ -28,6 +28,11 @@ export default function PINEntry({
   const [busy, setBusy] = useState(false)
   const [adminMode, setAdminMode] = useState(false)
   const PIN_LENGTH = adminMode ? ADMIN_PIN_LENGTH : BRANCH_PIN_LENGTH
+
+  // Download the admin workspace while the PIN is being typed, so it opens the moment sign-in succeeds.
+  useEffect(() => {
+    if (adminMode) void import("../admin/AdminDashboardEntry")
+  }, [adminMode])
 
   const fail = (message: string) => {
     setErrorMessage(message)
@@ -74,7 +79,7 @@ export default function PINEntry({
     setPin(newPin)
     setError(false)
     if (newPin.length === PIN_LENGTH) {
-      setTimeout(() => void submit(newPin), 150)
+      setTimeout(() => void submit(newPin), 60)
     }
   }
 
@@ -96,14 +101,14 @@ export default function PINEntry({
       <div
         className="absolute inset-0 z-0"
         style={{
-          backgroundImage: `url(https://images.unsplash.com/photo-1621605815971-fbc98d665033?w=800&h=1200&fit=crop&auto=format)`,
+          backgroundImage: `url(/images/photos/1621605815971-fbc98d665033.jpg)`,
           backgroundSize: "cover",
           backgroundPosition: "center",
           opacity: 0.05,
         }}
       />
 
-      <div className="relative z-10 flex flex-col min-h-[100dvh]">
+      <div className="relative z-10 flex flex-col flex-1">
         {/* Back button */}
         <div className="px-5 pt-page-fluid">
           <button

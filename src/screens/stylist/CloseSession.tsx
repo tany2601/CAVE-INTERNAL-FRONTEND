@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { Session, Service } from "../../types"
 import { Button, SectionLabel, AmountRow, Select, ServiceTile } from "../../components/ui"
 import { formatAmount } from "../../lib/format"
@@ -63,6 +63,25 @@ export default function CloseSession({ session, onComplete, onCancel }: Props) {
     session.discountType ?? "percent",
   )
   const stylist = getStylist(session.stylistId)
+
+  // Anything selected that isn't on the branch menu is a one-off custom service.
+  const menuIds = new Set(SERVICES.map((service) => service.id))
+  const customServices = selectedServices.filter((service) => !menuIds.has(service.id))
+  const nextCustomId = useRef(0)
+  const addCustomService = () =>
+    setSelectedServices((current) => [
+      ...current,
+      { id: `custom-${Date.now()}-${nextCustomId.current++}`, name: "", price: 0 },
+    ])
+  const updateCustomService = (id: string, patch: Partial<Service>) =>
+    setSelectedServices((current) =>
+      current.map((service) => (service.id === id ? { ...service, ...patch } : service)),
+    )
+  const removeCustomService = (id: string) =>
+    setSelectedServices((current) => current.filter((service) => service.id !== id))
+  const customInvalid = customServices.some(
+    (service) => service.name.trim().length === 0 || !(service.price > 0),
+  )
 
   const toggleService = (service: Service) => {
     setSelectedServices((current) =>
@@ -175,6 +194,63 @@ export default function CloseSession({ session, onComplete, onCancel }: Props) {
                   />
                 )
               })}
+            </div>
+
+            <div className="mt-3 flex flex-col gap-2">
+              {customServices.map((service) => (
+                <div
+                  key={service.id}
+                  className="flex items-center gap-3 bg-[var(--surface)] border border-[var(--border-subtle)] p-3 animate-fade-in"
+                >
+                  <div className="flex-1 min-w-0">
+                    <input
+                      className="w-full bg-transparent text-sm text-[var(--text)] outline-none"
+                      value={service.name}
+                      placeholder="Service name"
+                      aria-label="Custom service name"
+                      maxLength={60}
+                      onChange={(event) =>
+                        updateCustomService(service.id, { name: event.target.value })
+                      }
+                    />
+                    <div className="flex items-center mt-1 text-[var(--text-muted)]">
+                      <span className="text-xs mr-1">₹</span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min={0}
+                        className="w-24 bg-transparent text-xs outline-none"
+                        value={service.price || ""}
+                        placeholder="Price"
+                        aria-label="Custom service price"
+                        onChange={(event) =>
+                          updateCustomService(service.id, {
+                            price: Math.max(0, Number(event.target.value) || 0),
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <button
+                    aria-label="Remove custom service"
+                    className="w-8 h-8 flex items-center justify-center border border-[var(--border)] text-[var(--text-muted)]"
+                    onClick={() => removeCustomService(service.id)}
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              ))}
+              <button
+                className="flex items-center gap-2 py-2 text-[10px] tracking-[0.15em] uppercase text-[var(--text-muted)]"
+                onClick={addCustomService}
+              >
+                <Plus size={13} /> Add custom service
+              </button>
+              {customInvalid && (
+                <div className="text-[10px] text-[#E06060]">
+                  Give each custom service a name and a price.
+                </div>
+              )}
             </div>
           </div>
 
@@ -297,12 +373,12 @@ export default function CloseSession({ session, onComplete, onCancel }: Props) {
             <div className="flex">
               <Select
                 ariaLabel="Discount type"
-                className="min-w-[8.5rem] bg-[var(--elevated)] border border-r-0 border-[var(--border)] px-4 text-sm text-[var(--text)] outline-none"
+                className="w-[4.5rem] shrink-0 bg-[var(--elevated)] border border-r-0 border-[var(--border)] px-3 font-display font-700 text-base text-[var(--text)] outline-none select-compact"
                 value={discountMode}
                 onChange={(value) => setDiscountMode(value as "amount" | "percent")}
                 options={[
-                  { value: "percent", label: "% Percent" },
-                  { value: "amount", label: "₹ Amount" },
+                  { value: "percent", label: "% Percent", shortLabel: "%" },
+                  { value: "amount", label: "₹ Amount", shortLabel: "₹" },
                 ]}
               />
               <input
@@ -421,7 +497,7 @@ export default function CloseSession({ session, onComplete, onCancel }: Props) {
         <Button
           fullWidth
           size="lg"
-          disabled={selectedServices.length === 0 || submitting}
+          disabled={selectedServices.length === 0 || customInvalid || submitting}
           onClick={async () => {
             setSubmitting(true)
             setSubmitError(null)

@@ -38,6 +38,7 @@ export function Button({
   }
   return (
     <button
+      data-haptic={variant === "destructive" ? "heavy" : variant === "primary" ? "medium" : undefined}
       className={`${base} ${variants[variant]} ${sizes[size]} ${
         fullWidth ? "w-full" : ""
       } ${className}`}

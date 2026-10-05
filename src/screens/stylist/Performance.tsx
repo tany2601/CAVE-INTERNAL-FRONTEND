@@ -1,3 +1,4 @@
+import { EmptyNote } from "../../components/ui"
 import { useState } from "react"
 import { StylistNav } from "../../components/layout"
 import { SectionLabel } from "../../components/ui"
@@ -83,6 +84,12 @@ export default function Performance({ onNav, navTab }: Props) {
           <div className="px-5 py-5">
             <SectionLabel>Tap a stylist to see full stats</SectionLabel>
             <div className="flex flex-col gap-3">
+              {periodStats.loading && period.value !== "TODAY" && (
+                <EmptyNote>Loading…</EmptyNote>
+              )}
+              {stylists.length === 0 && !periodStats.loading && (
+                <EmptyNote>No stylists to show for this period yet.</EmptyNote>
+              )}
               {stylists.map((stylist, index) => {
                 const target = (stylist.dailyTarget ?? 0) * period.days
                 const progress = Math.min(

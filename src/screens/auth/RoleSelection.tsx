@@ -14,7 +14,7 @@ export default function RoleSelection({ onSelect }: Props) {
       <div
         className="absolute inset-0 z-0"
         style={{
-          backgroundImage: `url(https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=900&h=1600&fit=crop&auto=format&q=80)`,
+          backgroundImage: `url(/images/photos/1503951914875-452162b0f3f1.jpg)`,
           backgroundSize: "cover",
           backgroundPosition: "center",
           opacity: 0.5,
@@ -28,7 +28,7 @@ export default function RoleSelection({ onSelect }: Props) {
         }}
       />
 
-      <div className="relative z-10 flex flex-col min-h-[100dvh] px-6">
+      <div className="relative z-10 flex flex-col flex-1 px-6">
         {/* Logo block */}
         <div className="flex-1 flex flex-col items-center justify-center gap-3">
           <BrandLogo height={56} />

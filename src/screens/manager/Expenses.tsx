@@ -1,3 +1,4 @@
+import { EmptyNote } from "../../components/ui"
 import { useState } from "react"
 import { Button, SectionLabel } from "../../components/ui"
 import { formatAmount, formatTime } from "../../lib/format"
@@ -49,6 +50,7 @@ export default function Expenses({ onNav, navTab }: Props) {
 
         <div className="px-5 py-4 flex flex-col gap-2.5">
           <SectionLabel>All Expenses</SectionLabel>
+          {expenses.length === 0 && <EmptyNote>No expenses recorded today.</EmptyNote>}
           {expenses.map((exp) => {
             const emp = exp.employeeId
               ? stylists.find((s) => s.id === exp.employeeId)

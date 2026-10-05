@@ -1,3 +1,4 @@
+import { EmptyNote } from "../../components/ui"
 import { useState } from "react"
 import { Badge, Dialog } from "../../components/ui"
 import { formatTime, formatDuration, formatAmount } from "../../lib/format"
@@ -58,6 +59,13 @@ export default function Sessions({
 
       {/* List */}
       <div className="flex-1 overflow-y-auto pb-nav px-5 py-4 flex flex-col gap-2.5">
+        {(tab === "active" ? activeSessions : closedSessions).length === 0 && (
+          <EmptyNote>
+            {tab === "active"
+              ? "No active sessions right now."
+              : "No sessions have been closed today."}
+          </EmptyNote>
+        )}
         {tab === "active"
           ? activeSessions.map((session) => {
               const stylist = getStylist(session.stylistId)

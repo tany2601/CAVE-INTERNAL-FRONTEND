@@ -23,9 +23,9 @@ export function ScreenBackdrop({ src, opacity = 0.08 }: { src: string; opacity?:
 
 /** Photos used as screen backdrops (same barber photography as the PIN screen). */
 export const BACKDROPS = {
-  name: "https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=900&h=1400&fit=crop&auto=format&q=70",
-  phone: "https://images.unsplash.com/photo-1585747860715-2ba37e788b70?w=900&h=1400&fit=crop&auto=format&q=70",
-  services: "https://images.unsplash.com/photo-1621605815971-fbc98d665033?w=900&h=1400&fit=crop&auto=format&q=70",
-  loyalty: "https://images.unsplash.com/photo-1622286342621-4bd786c2447c?w=900&h=1400&fit=crop&auto=format&q=70",
-  stylists: "https://images.unsplash.com/photo-1599351431202-1e0f0137899a?w=900&h=1400&fit=crop&auto=format&q=70",
+  name: "/images/photos/1503951914875-452162b0f3f1.jpg",
+  phone: "/images/photos/1585747860715-2ba37e788b70.jpg",
+  services: "/images/photos/1621605815971-fbc98d665033.jpg",
+  loyalty: "/images/photos/1622286342621-4bd786c2447c.jpg",
+  stylists: "/images/photos/1599351431202-1e0f0137899a.jpg",
 }

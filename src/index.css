@@ -1,4 +1,21 @@
-@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;500;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap');
+@import '@fontsource/barlow-condensed/latin-400.css';
+@import '@fontsource/barlow-condensed/latin-ext-400.css';
+@import '@fontsource/barlow-condensed/latin-500.css';
+@import '@fontsource/barlow-condensed/latin-ext-500.css';
+@import '@fontsource/barlow-condensed/latin-600.css';
+@import '@fontsource/barlow-condensed/latin-ext-600.css';
+@import '@fontsource/barlow-condensed/latin-700.css';
+@import '@fontsource/barlow-condensed/latin-ext-700.css';
+@import '@fontsource/barlow-condensed/latin-800.css';
+@import '@fontsource/barlow-condensed/latin-ext-800.css';
+@import '@fontsource/dm-sans/latin-300.css';
+@import '@fontsource/dm-sans/latin-ext-300.css';
+@import '@fontsource/dm-sans/latin-400.css';
+@import '@fontsource/dm-sans/latin-ext-400.css';
+@import '@fontsource/dm-sans/latin-500.css';
+@import '@fontsource/dm-sans/latin-ext-500.css';
+@import '@fontsource/dm-sans/latin-600.css';
+@import '@fontsource/dm-sans/latin-ext-600.css';
 @import 'tailwindcss';
 
 @theme inline {
@@ -63,6 +80,8 @@
 }
 
 html {
+  /* Painted before anything else, so reopening the app never flashes white. */
+  background-color: var(--bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -81,12 +100,14 @@ body {
   font-size: 15px;
   line-height: 1.5;
   overflow: hidden;
-  height: 100dvh;
+  /* Pinned to the real screen edges. 100dvh falls short of the bottom safe area in an installed
+     iOS app (a black strip under the nav), while a fixed box always covers the whole screen. */
+  position: fixed;
+  inset: 0;
 }
 
 #root {
-  height: 100vh;
-  height: 100dvh;
+  height: 100%;
   /* Screens are laid out for the viewport height; if a short phone can't fit one,
      it scrolls instead of clipping the bottom. */
   overflow-x: hidden;
@@ -97,11 +118,16 @@ body {
 body { -webkit-user-select: none; user-select: none; }
 input, textarea, [contenteditable] { -webkit-user-select: text; user-select: text; }
 
-/* Tablets and desktops: the staff app keeps its phone layout in a centred column (the admin area stays full width).
+/* Tablets and desktops (the admin area stays full width).
+   The staff app is one column that follows the screen: in portrait it fills the window (up to 820px),
+   in landscape it stays a tall column centred in the window rather than stretching across it.
    The transform makes #root the containing block for fixed elements (bottom nav, sheets), so they stay inside it. */
 @media (min-width: 700px) {
+  /* Slightly larger type and spacing (rem-based) for the bigger screen. */
+  :root:has(body[data-shell="app"]) { font-size: 17.5px; }
+
   body[data-shell="app"] #root {
-    max-width: 600px;
+    max-width: min(820px, max(680px, 90dvh));
     margin-inline: auto;
     transform: translateZ(0);
     border-inline: 1px solid var(--border-subtle);
@@ -167,6 +193,12 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
 }
 
 .animate-slide-up { animation: slide-up 0.25s ease; }
+
+@keyframes toast-in {
+  from { transform: translateY(-1.25rem) scale(0.98); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+.animate-toast-in { animation: toast-in 0.28s cubic-bezier(0.32, 0.72, 0, 1); }
 .animate-fade-in { animation: fade-in 0.2s ease; }
 
 /* Sheet overlay */
@@ -422,9 +454,12 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
   padding-right: 1.5rem;
 }
 .select-placeholder { color: var(--text-faint); }
+/* Narrow trigger that shows a single symbol (e.g. the discount type): no room reserved for the chevron. */
+.select-trigger.select-compact { justify-content: center; gap: 0.35rem; }
+.select-trigger.select-compact .select-value { flex: none; padding-right: 0; }
 .select-leading { display: inline-flex; align-items: center; color: var(--text-muted); flex-shrink: 0; }
 .admin-select .select-leading svg { position: static; pointer-events: none; }
-.select-chevron { transition: transform 0.15s ease; }
+.select-chevron { transition: transform 0.15s ease; flex-shrink: 0; }
 .select-chevron.open { transform: rotate(180deg); }
 
 .select-menu {
@@ -518,7 +553,7 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
 /* Admin responsive fixes and page photography */
 .admin-photo-page,
 .admin-page-bg {
-  --admin-photo: url('https://images.unsplash.com/photo-1773904215697-e6c21fc27ac2?w=1600&h=1200&fit=crop&auto=format&q=78');
+  --admin-photo: url('/images/photos/1773904215697-e6c21fc27ac2.jpg');
   background-image:
     linear-gradient(
       to bottom,
@@ -533,28 +568,28 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
 
 .admin-sessions-page,
 .staff-page {
-  --admin-photo: url('https://images.unsplash.com/photo-1759134198561-e2041049419c?w=1600&h=1200&fit=crop&auto=format&q=78');
+  --admin-photo: url('/images/photos/1759134198561-e2041049419c.jpg');
 }
 
 .customers-page,
 .retention-page {
-  --admin-photo: url('https://images.unsplash.com/photo-1734807649640-2c4bfafcb580?w=1600&h=1200&fit=crop&auto=format&q=78');
+  --admin-photo: url('/images/photos/1734807649640-2c4bfafcb580.jpg');
 }
 
 .commission-page,
 .employee-page {
-  --admin-photo: url('https://images.unsplash.com/photo-1734723836256-0e168f4721a7?w=1600&h=1200&fit=crop&auto=format&q=78');
+  --admin-photo: url('/images/photos/1734723836256-0e168f4721a7.jpg');
 }
 
 .expense-page,
 .pricing-page {
-  --admin-photo: url('https://images.unsplash.com/photo-1761064039763-0d9aa5124510?w=1600&h=1200&fit=crop&auto=format&q=78');
+  --admin-photo: url('/images/photos/1761064039763-0d9aa5124510.jpg');
 }
 
 .settings-page,
 .branch-management-page,
 .branch-detail-page {
-  --admin-photo: url('https://images.unsplash.com/photo-1788985375145-81da8cc731a2?w=1600&h=1200&fit=crop&auto=format&q=78');
+  --admin-photo: url('/images/photos/1788985375145-81da8cc731a2.jpg');
 }
 
 .admin-view-more {
@@ -581,16 +616,20 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
   overflow: hidden;
   background:
     linear-gradient(90deg, rgba(0, 0, 0, 0.92), rgba(0, 0, 0, 0.36)),
-    url('https://images.unsplash.com/photo-1633681926022-84c23e8cb2d6?auto=format&fit=crop&w=1600&q=82')
+    url('/images/photos/1633681926022-84c23e8cb2d6.jpg')
       center/cover;
 }
 
 .branch-target-dial {
+  /* Explicit width AND height (not aspect-ratio): Safari stretched the aspect-ratio box into an oval. */
   width: 8rem;
-  aspect-ratio: 1;
+  height: 8rem;
+  flex: none;
+  align-self: center;
+  justify-self: start;
   padding: 0.5rem;
   border-radius: 50%;
-  background: conic-gradient(#f5f5f5 0 12%, rgba(255, 255, 255, 0.15) 12%);
+  background: conic-gradient(#f5f5f5 var(--progress, 0%), rgba(255, 255, 255, 0.15) var(--progress, 0%));
 }
 
 .branch-target-dial > div {
@@ -775,7 +814,7 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
   padding: 1rem;
   background:
     linear-gradient(130deg, rgba(0, 0, 0, 0.78), rgba(0, 0, 0, 0.16)),
-    url('https://images.unsplash.com/photo-1773904215697-e6c21fc27ac2?w=700&h=400&fit=crop&auto=format&q=78')
+    url('/images/photos/1773904215697-e6c21fc27ac2.jpg')
       center/cover;
   color: white;
   display: flex;
@@ -786,13 +825,13 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
 .branch-management-photo[data-index='1'] {
   background-image:
     linear-gradient(130deg, rgba(0, 0, 0, 0.78), rgba(0, 0, 0, 0.16)),
-    url('https://images.unsplash.com/photo-1734723836256-0e168f4721a7?w=700&h=400&fit=crop&auto=format&q=78');
+    url('/images/photos/1734723836256-0e168f4721a7.jpg');
 }
 
 .branch-management-photo[data-index='2'] {
   background-image:
     linear-gradient(130deg, rgba(0, 0, 0, 0.78), rgba(0, 0, 0, 0.16)),
-    url('https://images.unsplash.com/photo-1788985375145-81da8cc731a2?w=700&h=400&fit=crop&auto=format&q=78');
+    url('/images/photos/1788985375145-81da8cc731a2.jpg');
 }
 
 .branch-management-photo span {
@@ -860,6 +899,7 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
 
   .branch-target-dial {
     width: 6.5rem;
+    height: 6.5rem;
   }
 
   .branch-detail-toolbar {
@@ -1313,7 +1353,9 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
 
 .retention-ring {
   width: clamp(8rem, 18vw, 12rem);
-  aspect-ratio: 1;
+  height: clamp(8rem, 18vw, 12rem);
+  flex: none;
+  justify-self: center;
   padding: 0.75rem;
   border-radius: 50%;
   background: conic-gradient(
@@ -1873,4 +1915,36 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
     display: none;
     transform: none;
   }
+}
+
+
+/* Mobile density: tighter cards on phones. */
+@media (max-width: 640px) {
+  .expense-balance-strip {
+    padding: 0;
+    border-radius: 1rem;
+  }
+
+  .expense-balance-strip > div:not(.expense-flow-line) {
+    min-height: 0;
+    padding: 0.8rem 1rem;
+  }
+
+  .expense-balance-strip strong {
+    margin-top: 0.2rem;
+    font-size: 1.5rem;
+  }
+
+  .expense-balance-strip small {
+    margin-top: 0.1rem;
+  }
+}
+
+/* First load of an admin view: hold the content back until its data is in, then reveal it together. */
+.async-loading ~ * {
+  opacity: 0;
+  pointer-events: none;
+}
+.admin-reveal .async-marker ~ * {
+  animation: fade-in 0.35s ease both;
 }

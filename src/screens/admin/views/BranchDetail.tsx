@@ -70,7 +70,10 @@ export function BranchDetail({
                 Branch operating normally · {active} active now
               </div>
             </div>
-            <div className="branch-target-dial">
+            <div
+              className="branch-target-dial"
+              style={{ "--progress": `${Math.min(100, info?.targetPercent ?? 0)}%` } as React.CSSProperties}
+            >
               <div>
                 <strong>{info?.targetPercent ?? 0}%</strong>
                 <span>Monthly target</span>

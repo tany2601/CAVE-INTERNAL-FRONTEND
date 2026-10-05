@@ -4,11 +4,11 @@ import { formatAmount } from "../../lib/format"
 // All colour photographs: tiles are greyscaled by CSS until selected, so a source image that is
 // already black & white would never visibly "turn on".
 const SERVICE_IMAGES = [
-  "https://images.unsplash.com/photo-1621605815971-fbc98d665033?w=500&h=300&fit=crop&auto=format&q=80",
-  "https://images.unsplash.com/photo-1599351431202-1e0f0137899a?w=500&h=300&fit=crop&auto=format&q=80",
-  "https://images.unsplash.com/photo-1605497788044-5a32c7078486?w=500&h=300&fit=crop&auto=format&q=80",
-  "https://images.unsplash.com/photo-1622286342621-4bd786c2447c?w=500&h=300&fit=crop&auto=format&q=80",
-  "https://images.unsplash.com/photo-1585747860715-2ba37e788b70?w=500&h=300&fit=crop&auto=format&q=80",
+  "/images/photos/1621605815971-fbc98d665033.jpg",
+  "/images/photos/1599351431202-1e0f0137899a.jpg",
+  "/images/photos/1605497788044-5a32c7078486.jpg",
+  "/images/photos/1622286342621-4bd786c2447c.jpg",
+  "/images/photos/1585747860715-2ba37e788b70.jpg",
 ]
 
 /** Service card: black & white until selected, then full colour with a tick. */

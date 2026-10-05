@@ -1,3 +1,4 @@
+import { EmptyNote } from "../../../components/ui"
 import {
   Activity,
   ArrowRight,
@@ -109,6 +110,9 @@ export function Overview({
 
       <section>
         <CardHeader title="Branch pulse" meta="Tap any branch for full details" />
+        {data && branches.length === 0 && (
+          <EmptyNote className="mt-4">No active branches yet.</EmptyNote>
+        )}
         <div className="grid md:grid-cols-3 gap-3 mt-4">
           {branches.slice(0, PULSE_PREVIEW).map((branch) => (
             <BranchPulseCard key={branch.id} branch={branch} onOpen={onBranch} />
@@ -129,7 +133,14 @@ export function Overview({
       <div className="grid xl:grid-cols-[1.35fr_1fr] gap-3">
         <AdminCard className="p-5">
           <CardHeader title="Weekly revenue" meta="Monday — Sunday" />
-          <div className="h-52 flex items-end gap-2 sm:gap-3 mt-6">
+          {weeklyRevenue.every((day) => !day.value) && (
+            <EmptyNote className="mt-5">No revenue recorded this week yet.</EmptyNote>
+          )}
+          <div
+            className={`h-52 flex items-end gap-2 sm:gap-3 mt-6 ${
+              weeklyRevenue.every((day) => !day.value) ? "opacity-40" : ""
+            }`}
+          >
             {weeklyRevenue.map((item) => {
               const max = Math.max(1, ...weeklyRevenue.map((day) => day.value))
               return (

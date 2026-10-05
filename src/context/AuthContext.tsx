@@ -54,11 +54,17 @@ const expiryOf = (token: string): number => {
 
 const readStored = (): AuthState | null => {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    // Older builds kept the session in localStorage, which survives the app being closed.
+    for (const key of [STORAGE_KEY, SCREEN_KEY, ADMIN_SECTION_KEY]) localStorage.removeItem(key)
+  } catch {
+    // ignore
+  }
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw) as AuthState
     if (!parsed?.token || !parsed.role || expiryOf(parsed.token) <= Date.now()) {
-      localStorage.removeItem(STORAGE_KEY)
+      sessionStorage.removeItem(STORAGE_KEY)
       return null
     }
     return parsed
@@ -69,11 +75,11 @@ const readStored = (): AuthState | null => {
 
 const store = (state: AuthState | null) => {
   try {
-    if (state) localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+    if (state) sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state))
     else {
-      localStorage.removeItem(STORAGE_KEY)
-      localStorage.removeItem(SCREEN_KEY)
-      localStorage.removeItem(ADMIN_SECTION_KEY)
+      sessionStorage.removeItem(STORAGE_KEY)
+      sessionStorage.removeItem(SCREEN_KEY)
+      sessionStorage.removeItem(ADMIN_SECTION_KEY)
     }
   } catch {
     // Storage unavailable (private mode): the session just won't survive a reload.
@@ -81,8 +87,9 @@ const store = (state: AuthState | null) => {
 }
 
 /**
- * Keeps the signed-in session across reloads (localStorage) and renews the token in the
- * background, so the user stays signed in until they press Log out.
+ * Keeps the signed-in session across reloads and while the app sits in the background
+ * (sessionStorage), and renews the token in the background. Swiping the app away from recents
+ * ends the session, so the next launch starts at the role picker.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [auth, setAuth] = useState<AuthState | null>(() => {

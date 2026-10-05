@@ -36,7 +36,7 @@ export default function StylistMenu({
           <div
             className="absolute inset-0 z-0 opacity-5"
             style={{
-              backgroundImage: `url(https://images.unsplash.com/photo-1622286342621-4bd786c2447c?w=600&h=300&fit=crop)`,
+              backgroundImage: `url(/images/photos/1622286342621-4bd786c2447c.jpg)`,
               backgroundSize: "cover",
               backgroundPosition: "center",
             }}

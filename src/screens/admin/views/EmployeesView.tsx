@@ -1,3 +1,4 @@
+import { EmptyNote } from "../../../components/ui"
 import { useState } from "react"
 import {
   Banknote,
@@ -72,6 +73,9 @@ export function EmployeesView() {
             <span>Performance</span>
             <span>Time</span>
           </div>
+          {data && visible.length === 0 && (
+            <EmptyNote className="m-4">No employees to show yet.</EmptyNote>
+          )}
           {visible.slice(0, limit).map((item) => (
             <article key={item.id} className="employee-roster-row">
               <div className="flex items-center gap-3">

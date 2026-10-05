@@ -113,7 +113,7 @@ export default function AdminDashboard({ onLogout }: Props) {
   const adminActions = useAdminActions()
   const [section, setSection] = useState<AdminSection>(() => {
     try {
-      return (localStorage.getItem(storageKeys.adminSection) as AdminSection) || "overview"
+      return (sessionStorage.getItem(storageKeys.adminSection) as AdminSection) || "overview"
     } catch {
       return "overview"
     }
@@ -135,7 +135,7 @@ export default function AdminDashboard({ onLogout }: Props) {
   const navigate = (next: AdminSection) => {
     setSection(next)
     try {
-      localStorage.setItem(storageKeys.adminSection, next)
+      sessionStorage.setItem(storageKeys.adminSection, next)
     } catch {
       // ignore
     }
@@ -197,11 +197,11 @@ export default function AdminDashboard({ onLogout }: Props) {
       </header>
 
       <aside
-        className={`fixed inset-y-0 left-0 z-[70] w-[min(88vw,320px)] bg-[var(--surface-soft)] border-r border-[var(--border-subtle)] transition-transform duration-300 ${
+        className={`fixed inset-y-0 left-0 z-[70] flex w-[min(88vw,320px)] flex-col bg-[var(--surface-soft)] border-r border-[var(--border-subtle)] transition-transform duration-300 ${
           drawerOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="h-20 px-5 border-b border-[var(--border-subtle)] flex items-center justify-between">
+        <div className="shrink-0 min-h-20 px-5 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] border-b border-[var(--border-subtle)] flex items-center justify-between">
           <div>
             <BrandLogo height={26} />
             <div className="text-[9px] tracking-[0.28em] pt-2 uppercase text-[var(--text-muted)]">
@@ -216,7 +216,7 @@ export default function AdminDashboard({ onLogout }: Props) {
             <X size={18} />
           </button>
         </div>
-        <nav className="h-[calc(100%-8.5rem)] overflow-y-auto p-4">
+        <nav className="min-h-0 flex-1 overflow-y-auto p-4 pb-8">
           {navGroups.map((group) => {
             const expanded = expandedGroups.includes(group.id)
             return (
@@ -266,7 +266,7 @@ export default function AdminDashboard({ onLogout }: Props) {
             )
           })}
         </nav>
-        <div className="absolute bottom-0 inset-x-0 p-4 border-t border-[var(--border-subtle)]">
+        <div className="shrink-0 px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-[var(--border-subtle)]">
           <div className="rounded-xl bg-[var(--surface)] border border-[var(--border-subtle)] p-3">
             <div className="text-xs font-600">{profile.data?.name ?? "Admin"}</div>
             <div className="text-[10px] text-[var(--text-muted)] mt-0.5">

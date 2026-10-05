@@ -1,3 +1,4 @@
+import { EmptyNote } from "../../../components/ui"
 import { useState } from "react"
 import {
   ChevronRight,
@@ -72,6 +73,9 @@ export function CommissionView() {
             </div>
           </div>
           <div className="flex flex-col">
+            {data && visible.length === 0 && (
+              <EmptyNote>No pending payouts. Everyone is paid up.</EmptyNote>
+            )}
             {visible.slice(0, limit).map((item, index) => (
               <div key={item.userId} className="commission-queue-row">
                 <div className="commission-rank">

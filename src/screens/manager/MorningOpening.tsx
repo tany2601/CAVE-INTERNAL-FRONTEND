@@ -24,7 +24,7 @@ export default function MorningOpening({ onSave, onSkip }: Props) {
       <div
         className="absolute inset-0"
         style={{
-          backgroundImage: `url(https://images.unsplash.com/photo-1585747860715-2ba37e788b70?w=800&h=1200&fit=crop&auto=format)`,
+          backgroundImage: `url(/images/photos/1585747860715-2ba37e788b70.jpg)`,
           backgroundSize: "cover",
           backgroundPosition: "center",
           opacity: 0.04,

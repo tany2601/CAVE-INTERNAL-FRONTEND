@@ -115,12 +115,14 @@ const RESTORABLE: AppScreen[] = [
   "admin-dashboard",
 ]
 
+const SHOWS_BEFORE_DATA: AppScreen[] = ["welcome", "customer-name", "customer-phone"]
+
 const initialScreen = (role: string | undefined): AppScreen => {
   if (!role) return "role-selection"
   if (role === "ADMIN") return "admin-dashboard"
   let saved: string | null = null
   try {
-    saved = localStorage.getItem(storageKeys.screen)
+    saved = sessionStorage.getItem(storageKeys.screen)
   } catch {
     // ignore
   }
@@ -186,7 +188,7 @@ export default function AppRouter() {
   useEffect(() => {
     if (!auth || !RESTORABLE.includes(screen)) return
     try {
-      localStorage.setItem(storageKeys.screen, screen)
+      sessionStorage.setItem(storageKeys.screen, screen)
     } catch {
       // ignore
     }
@@ -341,7 +343,9 @@ export default function AppRouter() {
   }
 
   // ── Branch data gate ───────────────────────────────────────────────
-  if (!ready) {
+  // The landing and check-in screens need no branch data to draw, so they open instantly after
+  // sign-in while the data loads behind them. Everything else waits for it.
+  if (!ready && !SHOWS_BEFORE_DATA.includes(screen)) {
     return (
       <div className="flex flex-col h-full bg-[var(--bg)] items-center justify-center">
         <div className="text-[10px] tracking-[0.3em] uppercase text-[var(--text-muted)]">
@@ -351,7 +355,7 @@ export default function AppRouter() {
     )
   }
 
-  if (dataError && stylists.length === 0) {
+  if (ready && dataError && stylists.length === 0) {
     return (
       <div className="flex flex-col h-full bg-[var(--bg)] items-center justify-center gap-5 px-8 text-center">
         <div className="text-sm text-[#E06060]">{dataError}</div>

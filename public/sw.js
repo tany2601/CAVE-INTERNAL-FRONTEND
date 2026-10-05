@@ -1,6 +1,6 @@
 /* CAVE service worker: makes the app installable and start instantly.
  * It caches the app shell only. API calls are never cached, so data is always live. */
-const CACHE = "cave-shell-v1"
+const CACHE = "cave-shell-v2"
 const SHELL = ["/", "/manifest.webmanifest", "/favicon.svg", "/icons/icon-192.png"]
 
 self.addEventListener("install", (event) => {
@@ -24,22 +24,26 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return // photos, fonts: leave to the network/browser cache
   if (url.pathname.startsWith("/api/")) return // never cache data
 
-  // Page loads: latest from the network, falling back to the cached shell when offline.
+  // Page loads: show the cached shell straight away (no blank screen while the network wakes up)
+  // and refresh it in the background for next time. Offline, the cached shell is all there is.
   if (req.mode === "navigate") {
     event.respondWith(
-      fetch(req)
-        .then((res) => {
-          const copy = res.clone()
-          caches.open(CACHE).then((c) => c.put("/", copy))
-          return res
-        })
-        .catch(() => caches.match("/")),
+      caches.match("/").then((hit) => {
+        const network = fetch(req)
+          .then((res) => {
+            const copy = res.clone()
+            caches.open(CACHE).then((c) => c.put("/", copy))
+            return res
+          })
+          .catch(() => hit)
+        return hit || network
+      }),
     )
     return
   }
 
   // Built assets have hashed names, so cached copies never go stale.
-  if (url.pathname.startsWith("/assets/")) {
+  if (url.pathname.startsWith("/assets/") || url.pathname.startsWith("/images/") || url.pathname.startsWith("/splash/")) {
     event.respondWith(
       caches.match(req).then(
         (hit) =>

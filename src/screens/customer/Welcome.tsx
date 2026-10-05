@@ -1,3 +1,4 @@
+import { EmptyNote } from "../../components/ui"
 import { useState } from "react"
 import {
   Menu,
@@ -41,7 +42,7 @@ export default function Welcome({
         className="absolute inset-0 z-0 bg-cover bg-center"
         style={{
           backgroundImage:
-            "url(https://images.unsplash.com/photo-1599351431202-1e0f0137899a?w=900&h=1600&fit=crop&auto=format&q=85)",
+            "url(/images/photos/1599351431202-1e0f0137899a.jpg)",
         }}
       />
       <div
@@ -148,6 +149,9 @@ export default function Welcome({
               </button>
             </div>
             <div className="flex flex-col gap-2">
+              {activeSessions.length === 0 && (
+                <EmptyNote>No active sessions to bill right now.</EmptyNote>
+              )}
               {activeSessions.map((session) => (
                 <button
                   key={session.id}

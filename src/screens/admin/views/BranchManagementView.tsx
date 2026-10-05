@@ -1,3 +1,4 @@
+import { EmptyNote } from "../../../components/ui"
 import { useState } from "react"
 import {
   Building2,
@@ -133,6 +134,9 @@ export function BranchManagementView() {
 
         <AsyncNotice loading={loading && !data} error={error} onRetry={reload} />
 
+        {data && branches.length === 0 && (
+          <EmptyNote className="mt-7">No branches yet. Add the first one above.</EmptyNote>
+        )}
         <div className="branch-management-grid mt-7">
           {branches.map((branch, index) => {
             const staff = staffOf(branch.id)
