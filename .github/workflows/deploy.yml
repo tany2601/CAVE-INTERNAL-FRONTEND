@@ -1,0 +1,63 @@
+name: Deploy CAVE Frontend
+
+on:
+  push:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      VITE_API_BASE_URL: https://api-cave.paperlighttech.com/api
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Upload build
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "dist"
+          target: "/tmp/cave-frontend-deploy"
+
+      - name: Activate deployment
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+
+            DEPLOY_PATH="/var/www/paperlighttech/cave/CAVE-INTERNAL-FRONTEND"
+            TMP_PATH="/tmp/cave-frontend-deploy/dist"
+
+            rm -rf "${DEPLOY_PATH}/dist.new"
+            mv "$TMP_PATH" "${DEPLOY_PATH}/dist.new"
+
+            rm -rf "${DEPLOY_PATH}/dist"
+            mv "${DEPLOY_PATH}/dist.new" "${DEPLOY_PATH}/dist"
+
+            sudo nginx -t
+            sudo systemctl reload nginx
+
+            echo "CAVE frontend deployed successfully"
