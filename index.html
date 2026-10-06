@@ -75,8 +75,10 @@
       top: 0;
       left: 0;
       right: 0;
-      bottom: calc(0px - env(safe-area-inset-bottom)); /* Pull splash background down */
+      /* Pulls the splash mask down across the bottom indicator area */
+      bottom: calc(0px - env(safe-area-inset-bottom));
       padding-bottom: env(safe-area-inset-bottom);
+
       z-index: 9999;
       display: flex;
       flex-direction: column;
