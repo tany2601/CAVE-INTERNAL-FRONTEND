@@ -84,7 +84,6 @@ html {
   background-color: var(--bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  height: 100%;
 }
 
 html, body {
@@ -100,32 +99,17 @@ body {
   font-family: 'DM Sans', sans-serif;
   font-size: 15px;
   line-height: 1.5;
-  
-  /* CRITICAL: Remove 'position: fixed' and 'inset: 0'. 
-     Instead, use min-height with fallback units to stretch the body background behind the gesture bar. */
-  min-height: 100vh;
-  min-height: 100dvh; 
-  
-  /* Retain your app behavior flags */
-  overscroll-behavior: none;
-  -webkit-tap-highlight-color: transparent;
-  -webkit-touch-callout: none;
-  touch-action: manipulation;
-  -webkit-user-select: none; 
-  user-select: none;
+  overflow: hidden;
+  /* Pinned to the real screen edges. 100dvh falls short of the bottom safe area in an installed
+     iOS app (a black strip under the nav), while a fixed box always covers the whole screen. */
+  position: fixed;
+  inset: 0;
 }
 
 #root {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  
-  /* Force WebKit's clipping mask down below the bottom bar */
-  margin-bottom: calc(0px - env(safe-area-inset-bottom));
-  padding-bottom: env(safe-area-inset-bottom);
-  
+  height: 100%;
+  /* Screens are laid out for the viewport height; if a short phone can't fit one,
+     it scrolls instead of clipping the bottom. */
   overflow-x: hidden;
   overflow-y: auto;
 }
