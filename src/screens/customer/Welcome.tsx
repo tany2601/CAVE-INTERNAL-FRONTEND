@@ -70,13 +70,6 @@ export default function Welcome({
           >
             {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
           </button>
-          <button
-            aria-label="Open dashboard"
-            className="w-10 h-10 flex items-center justify-center text-white/70 tap-target rounded-full bg-black/25 backdrop-blur-sm"
-            onClick={onMenu}
-          >
-            <Menu size={20} strokeWidth={1.5} />
-          </button>
         </div>
       </div>
 

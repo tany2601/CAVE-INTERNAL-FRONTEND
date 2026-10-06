@@ -104,8 +104,6 @@ body {
      iOS app (a black strip under the nav), while a fixed box always covers the whole screen. */
   position: fixed;
   inset: 0;
-  /* Set from script when an installed iOS app reports a layout viewport shorter than the screen. */
-  height: var(--app-h, auto);
 }
 
 #root {

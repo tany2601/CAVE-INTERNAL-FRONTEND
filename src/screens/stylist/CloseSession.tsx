@@ -292,7 +292,7 @@ export default function CloseSession({ session, onComplete, onCancel }: Props) {
             <div className="mt-3 flex flex-col gap-2">
               {products.map((product, index) => (
                 <div
-                  key={`${product.name}-${index}`}
+                  key={index}
                   className="flex items-center gap-3 bg-[var(--surface)] border border-[var(--border-subtle)] p-3"
                 >
                   <div className="flex-1 min-w-0">
