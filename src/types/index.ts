@@ -38,6 +38,17 @@ export interface Stylist {
   commissionPaid: boolean;
   dailyTarget?: number;
   services?: { name: string; count: number }[];
+  /** Revenue and tips split by how the customer paid (tips follow the bill's payment mode). */
+  cashRevenue?: number;
+  gpayRevenue?: number;
+  cashTips?: number;
+  gpayTips?: number;
+  /** Tips already handed over, and what is still available to withdraw. */
+  tipsWithdrawn?: number;
+  tipsAvailable?: number;
+  /** Time spent with customers in the period, and the average per finished session (minutes). */
+  workMinutes?: number;
+  avgSessionMinutes?: number;
 }
 
 export interface Service {

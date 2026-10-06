@@ -6,15 +6,18 @@ import {
   Plus,
   Save,
   Search,
+  ShoppingBag,
   Trash2,
+  BadgeIndianRupee,
 } from "lucide-react"
 import { Input } from "../../../components/ui"
 import { adminApi } from "../../../lib/api"
+import type { ProductPeriod } from "../../../lib/api/admin"
 import { useAsyncData } from "../../../hooks/useAsyncData"
 import { useImageUpload } from "../../../hooks/useImageUpload"
 import type { ApiProduct } from "../../../types/api"
 import { formatMoney } from "../adminTypes"
-import { AdminModal, AdminSelect, AsyncNotice, Field, PageHeading, StatusBadge, ViewMoreButton } from "../components"
+import { AdminModal, AdminSelect, AsyncNotice, Field, MetricCard, PageHeading, StatusBadge, ViewMoreButton } from "../components"
 import { useAdminActions } from "../hooks/useAdminActions"
 
 interface ProductForm {
@@ -38,7 +41,11 @@ const emptyForm: ProductForm = {
 
 export function ProductsView() {
   const actions = useAdminActions()
-  const { data, loading, error, reload } = useAsyncData(() => adminApi.listProducts())
+  const [salesPeriod, setSalesPeriod] = useState<ProductPeriod>("THIS_MONTH")
+  const state = useAsyncData(() => adminApi.listProducts(salesPeriod), [salesPeriod])
+  const { loading, error, reload } = state
+  const data = state.data?.data
+  const summary = state.data?.summary
   const [query, setQuery] = useState("")
   const [limit, setLimit] = useState(9)
   const [editing, setEditing] = useState<ProductForm | undefined>()
@@ -100,7 +107,42 @@ export function ProductsView() {
           </button>
         </div>
 
-        <label className="admin-input h-12 flex items-center gap-3 mt-6">
+        <div className="mt-6 flex flex-col gap-3">
+          <div className="admin-segment w-fit max-w-full overflow-x-auto">
+            {(
+              [
+                ["TODAY", "Today"],
+                ["THIS_WEEK", "This Week"],
+                ["THIS_MONTH", "This Month"],
+                ["ALL_TIME", "All Time"],
+              ] as [ProductPeriod, string][]
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                className={salesPeriod === value ? "active" : ""}
+                onClick={() => setSalesPeriod(value)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <MetricCard
+              icon={<ShoppingBag size={18} />}
+              label="Products sold"
+              value={String(summary?.totalSold ?? 0)}
+              detail="Units on completed bills"
+            />
+            <MetricCard
+              icon={<BadgeIndianRupee size={18} />}
+              label="Product revenue"
+              value={formatMoney(summary?.totalRevenue ?? 0)}
+              detail="Before discounts and tips"
+            />
+          </div>
+        </div>
+
+        <label className="admin-input h-12 flex items-center gap-3 mt-4">
           <Search size={16} />
           <input
             className="flex-1 bg-transparent outline-none min-w-0 text-sm"
@@ -160,6 +202,9 @@ export function ProductsView() {
                     {p.description}
                   </p>
                 )}
+                <div className="text-[10px] text-[var(--text-muted)]">
+                  {p.sold} sold · {formatMoney(p.revenue)} revenue
+                </div>
                 <div className="mt-auto flex items-center justify-between pt-1">
                   <div className="font-display font-800 text-2xl">{formatMoney(p.price)}</div>
                   <div className="flex gap-2">

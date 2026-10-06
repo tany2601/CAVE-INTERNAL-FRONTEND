@@ -1,9 +1,9 @@
-import { EmptyNote } from "../../components/ui"
-import { SectionLabel } from "../../components/ui"
+import { EmptyNote, Podium, SectionLabel } from "../../components/ui"
+import { PACE_CLASS, PACE_LABEL, paceOf } from "../../lib/pace"
 import { ManagerNav } from "../../components/layout"
 import { formatAmount, formatDuration } from "../../lib/format"
 import { useBranchData } from "../../context/BranchDataContext"
-import { Session } from "../../types"
+import { Session, Stylist } from "../../types"
 import {
   Clock,
   ArrowRight,
@@ -42,9 +42,17 @@ export default function ManagerHome({
     activeSessions,
     closedSessions,
     expenses,
+    payouts,
     getStylist,
     branchShort,
   } = useBranchData()
+  const productSales = closedSessions.reduce(
+    (a, s) => a + (s.products ?? []).reduce((b, p) => b + p.price * p.qty, 0),
+    0,
+  )
+  const tipWithdrawals = payouts
+    .filter((p) => p.kind === "TIP_WITHDRAWAL")
+    .reduce((a, p) => a + p.amount, 0)
   const totalRevenue = closedSessions.reduce((a, s) => a + (s.total || 0), 0)
   const cashRevenue = closedSessions
     .filter((s) => s.paymentMode === "cash")
@@ -54,9 +62,6 @@ export default function ManagerHome({
     .reduce((a, s) => a + (s.total || 0), 0)
   const totalCommission = stylists.reduce((a, s) => a + s.commission, 0)
   const totalExpenses = expenses.reduce((a, e) => a + e.amount, 0)
-  const topPerformer = [...stylists].sort(
-    (a, b) => b.revenueToday - a.revenueToday,
-  )[0]
   const now = new Date()
   const hour = now.getHours()
   const greeting = hour < 12 ? "Morning" : hour < 17 ? "Afternoon" : "Evening"
@@ -145,6 +150,10 @@ export default function ManagerHome({
               value={String(closedSessions.length + activeSessions.length)}
               large
             />
+          </div>
+          <div className="grid grid-cols-2 gap-2 mb-2">
+            <RevenueCard label="Product sales" value={formatAmount(productSales)} />
+            <RevenueCard label="Tip withdrawals" value={formatAmount(tipWithdrawals)} />
           </div>
           <div className="grid grid-cols-4 gap-2">
             <SmallStat label="Cash" value={formatAmount(cashRevenue)} />
@@ -259,46 +268,26 @@ export default function ManagerHome({
                   <div className="font-display font-700 text-sm text-[var(--text)]">
                     {formatAmount(s.revenueToday)}
                   </div>
-                  <div
-                    className={`text-[9px] tracking-wider uppercase mt-0.5 ${
-                      s.available
-                        ? "text-[#4CAF86]"
-                        : "text-[var(--text-subtle)]"
-                    }`}
-                  >
-                    {s.available ? "Active" : "Away"}
-                  </div>
+                  <PaceBadge stylist={s} />
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Top performer */}
-        {topPerformer && (
-        <div className="px-5 pb-5">
-          <SectionLabel>Top Performer Today</SectionLabel>
-          <div
-            className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm p-4 flex items-center gap-4"
-            style={{ borderRadius: "4px" }}
-          >
-            <div className="w-12 h-12 rounded-full bg-[var(--elevated)] border border-[var(--border)] flex items-center justify-center font-display font-800 text-base text-[var(--text-secondary)]">
-              {topPerformer.name.slice(0, 2).toUpperCase()}
-            </div>
-            <div className="flex-1">
-              <div className="font-display font-800 tracking-wider uppercase text-base text-[var(--text)]">
-                {topPerformer.name}
-              </div>
-              <div className="text-[11px] text-[var(--text-muted)] mt-0.5">
-                {topPerformer.completedToday} customers ·{" "}
-                {formatAmount(topPerformer.revenueToday)}
-              </div>
-            </div>
-            <div className="text-[9px] tracking-[0.2em] uppercase text-[#6B9FD4] border border-[rgba(61,111,168,0.25)] px-2.5 py-1.5 rounded-sm">
-              #1
-            </div>
+        {/* Top performers */}
+        {stylists.some((s) => s.revenueToday > 0) && (
+          <div className="px-5 pb-5">
+            <SectionLabel>Top Performers Today</SectionLabel>
+            <Podium
+              entries={stylists.map((s) => ({
+                id: s.id,
+                name: s.name,
+                value: s.revenueToday,
+                detail: `${s.completedToday} customer${s.completedToday === 1 ? "" : "s"}`,
+              }))}
+            />
           </div>
-        </div>
         )}
       </div>
 
@@ -343,5 +332,18 @@ function SmallStat({ label, value }: { label: string; value: string }) {
         {label}
       </div>
     </div>
+  )
+}
+
+/** Below / On track / Good, from today's revenue against where the daily target says they should be by now. */
+function PaceBadge({ stylist }: { stylist: Stylist }) {
+  const { status, percent } = paceOf(stylist)
+  return (
+    <span
+      title={`${percent}% of expected pace`}
+      className={`mt-1 inline-flex min-w-[4.5rem] items-center justify-center whitespace-nowrap rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-widest ${PACE_CLASS[status]}`}
+    >
+      {PACE_LABEL[status]}
+    </span>
   )
 }

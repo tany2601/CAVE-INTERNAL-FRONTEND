@@ -1,6 +1,7 @@
 import { request } from "./http"
 import type {
   ApiProduct,
+  ApiProductSummary,
   RolePinValues,
   AdminChecklistTask,
   AdminProfile,
@@ -65,6 +66,9 @@ export const updateBranch = (id: string, body: Partial<BranchInput>) => request(
 export const setBranchStatus = (id: string, isActive: boolean) =>
   request("PATCH", `/admin/branches/${id}/status`, { body: { isActive } })
 
+/** Permanently removes a branch that has never traded (the server refuses otherwise). */
+export const deleteBranch = (id: string) => request<unknown>("DELETE", `/admin/branches/${id}`)
+
 export const setBranchRolePin = (branchId: string, role: "MANAGER" | "STYLIST", pin: string) =>
   request("PUT", `/admin/branches/${branchId}/role-pins/${role}`, { body: { pin } })
 
@@ -113,6 +117,9 @@ export const updateStaff = (id: string, body: Partial<StaffInput>) =>
 
 export const setStaffStatus = (id: string, isActive: boolean) =>
   request<unknown>("PATCH", `/admin/staff/${id}/status`, { body: { isActive } })
+
+/** Permanently removes a staff member with no history (the server refuses otherwise). */
+export const deleteStaff = (id: string) => request<unknown>("DELETE", `/admin/staff/${id}`)
 
 // ── Services & per-branch menu pricing ───────────────────────────────
 export const listServices = () =>
@@ -279,8 +286,13 @@ export interface ProductInput {
   isActive?: boolean
 }
 
-export const listProducts = () =>
-  request<{ data: ApiProduct[] }>("GET", "/admin/products").then((r) => r.data)
+export type ProductPeriod = "TODAY" | "THIS_WEEK" | "THIS_MONTH" | "ALL_TIME"
+
+/** Products with units sold / revenue for the period, plus the period's totals. */
+export const listProducts = (period: ProductPeriod = "ALL_TIME") =>
+  request<{ data: ApiProduct[]; summary: ApiProductSummary }>("GET", "/admin/products", {
+    query: { period },
+  })
 
 export const createProduct = (body: ProductInput) =>
   request<ApiProduct>("POST", "/admin/products", { body })

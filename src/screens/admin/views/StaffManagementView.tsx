@@ -3,6 +3,7 @@ import {
   ImagePlus,
   Pencil,
   Save,
+  Trash2,
   UserPlus,
 } from "lucide-react"
 import { Button, Input, PhoneInput } from "../../../components/ui"
@@ -155,6 +156,26 @@ export function StaffManagementView() {
               >
                 {item.isActive ? "Deactivate" : "Reactivate"}
               </Button>
+              <button
+                className="admin-danger-icon staff-delete shrink-0"
+                aria-label={`Delete ${item.name}`}
+                onClick={() =>
+                  actions.request({
+                    title: `Delete ${item.name}?`,
+                    message:
+                      "This permanently removes them. It only works for people with no sessions or payments on record. Otherwise, deactivate them to keep the history.",
+                    confirmLabel: "Delete",
+                    destructive: true,
+                    action: async () => {
+                      await adminApi.deleteStaff(item.id)
+                      await reload()
+                    },
+                    successMessage: `${item.name} deleted`,
+                  })
+                }
+              >
+                <Trash2 size={15} />
+              </button>
             </article>
           ))}
         </div>

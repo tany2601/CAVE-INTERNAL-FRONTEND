@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react"
+import { ErrorNotice } from "../../../components/ui"
 
 /**
  * Loading / error placeholder for admin views that fetch from the API.
@@ -17,6 +18,9 @@ export function AsyncNotice({
 }) {
   const node = useRef<HTMLElement | null>(null)
   const wasLoading = useRef(false)
+  const setNode = (el: HTMLElement | null) => {
+    node.current = el
+  }
 
   useEffect(() => {
     if (loading) {
@@ -32,32 +36,24 @@ export function AsyncNotice({
   }, [loading])
 
   if (!loading && !error) {
-    return <span hidden ref={node} className="async-marker" />
+    return <span hidden ref={setNode} className="async-marker" />
+  }
+  if (!loading && error) {
+    return (
+      <div ref={setNode} className="async-marker mt-7">
+        <ErrorNotice message={error} onRetry={onRetry} />
+      </div>
+    )
   }
   return (
     <div
-      ref={(el) => {
-        node.current = el
-      }}
-      className={`async-marker mt-7 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] px-5 py-8 text-center ${
-        loading ? "async-loading" : ""
-      }`}
+      ref={setNode}
+      className="async-marker async-loading mt-7 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] px-5 py-8 text-center"
     >
-      {loading ? (
-        <div className="flex items-center justify-center gap-3 text-[10px] tracking-[0.3em] uppercase text-[var(--text-muted)]">
-          <span className="h-3 w-3 animate-spin rounded-full border border-[var(--text-muted)] border-t-transparent" />
-          Loading
-        </div>
-      ) : (
-        <>
-          <div className="text-sm text-[#E06060]">{error}</div>
-          {onRetry && (
-            <button className="admin-secondary-button mt-4" onClick={onRetry}>
-              Retry
-            </button>
-          )}
-        </>
-      )}
+      <div className="flex items-center justify-center gap-3 text-[10px] tracking-[0.3em] uppercase text-[var(--text-muted)]">
+        <span className="h-3 w-3 animate-spin rounded-full border border-[var(--text-muted)] border-t-transparent" />
+        Loading
+      </div>
     </div>
   )
 }

@@ -16,6 +16,7 @@ import {
   mapStylist,
 } from "../lib/mappers"
 import { useAuth } from "./AuthContext"
+import { MESSAGES } from "../lib/errors"
 import type { Expense, Service, Session, Stylist } from "../types"
 import type { ApiCheckoutProduct, ApiDay, ApiPayout } from "../types/api"
 
@@ -104,7 +105,7 @@ export function BranchDataProvider({ children }: { children: ReactNode }) {
       setError(null)
     } catch (e) {
       if (activeToken.current !== forToken) return
-      setError(e instanceof Error ? e.message : "Failed to load branch data")
+      setError(e instanceof Error ? e.message : MESSAGES.server)
     } finally {
       if (activeToken.current === forToken) setReady(true)
     }

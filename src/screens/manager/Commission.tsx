@@ -17,6 +17,15 @@ interface Props {
 export default function Commission({ onNav, navTab }: Props) {
   const { stylists, refresh } = useBranchData()
   const [paying, setPaying] = useState<Stylist | null>(null)
+  /** What the open sheet settles: the day's commission, or tips handed over to the stylist. */
+  const [payKind, setPayKind] = useState<"COMMISSION" | "TIP_WITHDRAWAL">("COMMISSION")
+  const isTips = payKind === "TIP_WITHDRAWAL"
+  const payAmount = paying ? (isTips ? (paying.tipsAvailable ?? 0) : paying.commission) : 0
+  const openSheet = (stylist: Stylist, kind: "COMMISSION" | "TIP_WITHDRAWAL") => {
+    setPayError(null)
+    setPayKind(kind)
+    setPaying(stylist)
+  }
   const [payMode, setPayMode] = useState<"cash" | "gpay">("cash")
   const [saving, setSaving] = useState(false)
   const [payError, setPayError] = useState<string | null>(null)
@@ -29,7 +38,8 @@ export default function Commission({ onNav, navTab }: Props) {
       await staffApi.createPayout({
         userId: stylist.id,
         paymentMode: toApiMode(payMode),
-        amount: stylist.commission,
+        kind: payKind,
+        amount: payAmount,
       })
       await refresh()
       setPaying(null)
@@ -135,7 +145,7 @@ export default function Commission({ onNav, navTab }: Props) {
               {!s.commissionPaid ? (
                 <button
                   className="w-full border-t border-[var(--border-subtle)] py-3 font-display font-700 tracking-[0.2em] uppercase text-xs text-[var(--text)] tap-target active:bg-[var(--text)] active:text-[var(--bg)] transition-all"
-                  onClick={() => setPaying(s)}
+                  onClick={() => openSheet(s, "COMMISSION")}
                 >
                   Mark Paid · {formatAmount(s.commission)}
                 </button>
@@ -144,6 +154,19 @@ export default function Commission({ onNav, navTab }: Props) {
                   Commission settled
                 </div>
               )}
+
+              {/* Tips: handed over separately from commission */}
+              <button
+                className="w-full border-t border-[var(--border-subtle)] py-3 font-display font-700 tracking-[0.2em] uppercase text-xs text-[var(--text-secondary)] tap-target active:bg-[var(--text)] active:text-[var(--bg)] transition-all disabled:opacity-40 disabled:pointer-events-none"
+                disabled={(s.tipsAvailable ?? 0) <= 0}
+                onClick={() => openSheet(s, "TIP_WITHDRAWAL")}
+              >
+                {(s.tipsAvailable ?? 0) > 0
+                  ? `Withdraw tips · ${formatAmount(s.tipsAvailable ?? 0)}`
+                  : (s.tipsWithdrawn ?? 0) > 0
+                    ? `Tips withdrawn · ${formatAmount(s.tipsWithdrawn ?? 0)}`
+                    : "No tips to withdraw"}
+              </button>
             </div>
           ))}
         </div>
@@ -159,7 +182,7 @@ export default function Commission({ onNav, navTab }: Props) {
             <div className="flex items-start justify-between">
               <div>
                 <div className="font-display font-700 tracking-wider uppercase text-sm text-[var(--text)]">
-                  Mark Commission Paid
+                  {isTips ? "Withdraw Tips" : "Mark Commission Paid"}
                 </div>
                 <div className="text-[11px] text-[var(--text-muted)] mt-1">
                   {paying.name}
@@ -175,10 +198,10 @@ export default function Commission({ onNav, navTab }: Props) {
 
             <div className="bg-[var(--surface-soft)] border border-[var(--border-subtle)] rounded-sm p-5 text-center">
               <div className="text-[9px] text-[var(--text-subtle)] tracking-widest uppercase mb-2">
-                Amount to Pay
+                {isTips ? "Tips to hand over" : "Amount to Pay"}
               </div>
               <div className="font-display font-800 text-4xl text-[var(--text)]">
-                {formatAmount(paying.commission)}
+                {formatAmount(payAmount)}
               </div>
             </div>
 
@@ -219,10 +242,10 @@ export default function Commission({ onNav, navTab }: Props) {
               <Button
                 variant="primary"
                 fullWidth
-                disabled={saving || paying.commission <= 0}
+                disabled={saving || payAmount <= 0}
                 onClick={() => void markPaid(paying)}
               >
-                {saving ? "Saving…" : "Confirm Paid"}
+                {saving ? "Saving…" : isTips ? "Confirm Withdrawal" : "Confirm Paid"}
               </Button>
             </div>
           </div>

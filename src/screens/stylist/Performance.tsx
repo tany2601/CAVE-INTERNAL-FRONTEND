@@ -1,4 +1,5 @@
-import { EmptyNote } from "../../components/ui"
+import { EmptyNote, Podium } from "../../components/ui"
+import { StylistStats } from "../../components/StylistStats"
 import { useState } from "react"
 import { StylistNav } from "../../components/layout"
 import { SectionLabel } from "../../components/ui"
@@ -82,6 +83,20 @@ export default function Performance({ onNav, navTab }: Props) {
 
         {!selected ? (
           <div className="px-5 py-5">
+            {stylists.some((s) => s.revenueToday > 0) && (
+              <div className="mb-7">
+                <SectionLabel>Top performers · {period.label}</SectionLabel>
+                <Podium
+                  onSelect={setSelectedId}
+                  entries={stylists.map((s) => ({
+                    id: s.id,
+                    name: s.name,
+                    value: s.revenueToday,
+                    detail: `${s.completedToday} customer${s.completedToday === 1 ? "" : "s"}`,
+                  }))}
+                />
+              </div>
+            )}
             <SectionLabel>Tap a stylist to see full stats</SectionLabel>
             <div className="flex flex-col gap-3">
               {periodStats.loading && period.value !== "TODAY" && (
@@ -108,7 +123,7 @@ export default function Performance({ onNav, navTab }: Props) {
                           {stylist.name}
                         </div>
                         <div className="text-[10px] text-[var(--text-muted)] mt-1">
-                          {stylist.completedToday} customers ·{" "}
+                          {stylist.completedToday} customer{stylist.completedToday === 1 ? "" : "s"} ·{" "}
                           {formatAmount(stylist.revenueToday)}
                         </div>
                       </div>
@@ -142,7 +157,7 @@ export default function Performance({ onNav, navTab }: Props) {
             </div>
           </div>
         ) : (
-          <StylistMetrics stylist={selected} period={period} />
+          <StylistMetrics stylist={selected} period={period} ranking={stylists} />
         )}
       </div>
 
@@ -154,11 +169,16 @@ export default function Performance({ onNav, navTab }: Props) {
 function StylistMetrics({
   stylist,
   period,
+  ranking,
 }: {
   stylist: Stylist
   period: (typeof PERIODS)[number]
+  /** Everyone in the same period, to work out this stylist's rank. */
+  ranking: Stylist[]
 }) {
-  const { stylists, branchName } = useBranchData()
+  const { branchName } = useBranchData()
+  const rank = [...ranking].sort((a, b) => b.revenueToday - a.revenueToday).findIndex((s) => s.id === stylist.id) + 1
+  const periodWord = period.value === "TODAY" ? "today" : period.value === "THIS_WEEK" ? "this week" : "this month"
   const target = (stylist.dailyTarget ?? 0) * period.days
   const averageTicket = Math.round(
     stylist.revenueToday / Math.max(stylist.completedToday, 1),
@@ -169,13 +189,13 @@ function StylistMetrics({
     <div className="px-5 py-5 flex flex-col gap-5">
       <div className="bg-[var(--surface)] border border-[var(--border)] p-5 text-center">
         <div className="text-[9px] tracking-[0.3em] uppercase text-[var(--text-muted)]">
-          Top performer today
+          {rank === 1 ? "Top performer" : "Performance"} {periodWord}
         </div>
         <div className="font-display font-800 text-4xl tracking-wider text-[var(--text)] mt-2">
           {stylist.name.toUpperCase()}
         </div>
         <div className="text-xs text-[var(--text-muted)] mt-1">
-          {branchName} · daily rank #{stylists.indexOf(stylist) + 1}
+          {branchName} · rank #{rank} {periodWord}
         </div>
       </div>
 
@@ -189,6 +209,11 @@ function StylistMetrics({
           label="Take home"
           value={formatAmount(stylist.commission + stylist.tips)}
         />
+      </div>
+
+      <div>
+        <SectionLabel>Cash vs GPay · {periodWord}</SectionLabel>
+        <StylistStats stylist={stylist} periodLabel={periodWord} />
       </div>
 
       <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-4">

@@ -1,7 +1,8 @@
 import { useState } from "react"
 import { StylistNav } from "../../components/layout"
 import { SectionLabel } from "../../components/ui"
-import { formatDuration, formatAmount } from "../../lib/format"
+import { StylistStats } from "../../components/StylistStats"
+import { formatDuration, formatAmount, formatMinutes, sessionMinutes } from "../../lib/format"
 import { useBranchData } from "../../context/BranchDataContext"
 import { Session } from "../../types"
 import {
@@ -161,6 +162,10 @@ export default function StylistHome({
             >
               <ArrowLeft size={13} /> All stylists
             </button>
+            <SectionLabel>Today's stats</SectionLabel>
+            <div className="mb-7">
+              <StylistStats stylist={selected} periodLabel="today" />
+            </div>
             <SectionLabel>Active ({active.length})</SectionLabel>
             <div className="flex flex-col gap-2 mb-7">
               {active.length ? (
@@ -193,8 +198,14 @@ export default function StylistHome({
                           .join(" · ")}
                       </div>
                     </div>
-                    <div className="font-display font-700 text-[var(--text)]">
-                      {formatAmount(session.total || 0)}
+                    <div className="text-right shrink-0 pl-3">
+                      <div className="font-display font-700 text-[var(--text)]">
+                        {formatAmount(session.total || 0)}
+                      </div>
+                      <div className="flex items-center justify-end gap-1 text-[10px] text-[var(--text-muted)] mt-0.5">
+                        <Clock size={10} />
+                        {formatMinutes(sessionMinutes(session.startTime, session.closedAt))}
+                      </div>
                     </div>
                   </div>
                 ))

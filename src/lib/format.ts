@@ -21,3 +21,15 @@ export const formatAmount = (n: number): string => {
     })
   )
 }
+
+/** "45m", "1h 05m", "—" for zero. Input is whole minutes. */
+export const formatMinutes = (mins: number): string => {
+  const m = Math.max(0, Math.round(mins))
+  if (m === 0) return "—"
+  if (m < 60) return `${m}m`
+  return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`
+}
+
+/** How long a finished session took, from its start to when it was closed. */
+export const sessionMinutes = (start: Date, end?: Date): number =>
+  end ? Math.max(0, Math.round((end.getTime() - start.getTime()) / 60000)) : 0

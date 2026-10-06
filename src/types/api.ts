@@ -70,6 +70,14 @@ export interface ApiStylist {
   services: { name: string; count: number }[]
   commissionPaid?: boolean
   commissionPaidAmount?: number
+  cashRevenue?: number
+  gpayRevenue?: number
+  cashTips?: number
+  gpayTips?: number
+  tipsWithdrawn?: number
+  tipsAvailable?: number
+  workMinutes?: number
+  avgSessionMinutes?: number
 }
 
 export interface ApiDay {
@@ -437,6 +445,15 @@ export interface ApiProduct {
   price: number
   imageUrl: string | null
   isActive: boolean
+  /** Units sold and revenue over the period the list was requested for. */
+  sold: number
+  revenue: number
+}
+
+export interface ApiProductSummary {
+  period: string
+  totalSold: number
+  totalRevenue: number
 }
 
 /** Product as offered at checkout (active only). */

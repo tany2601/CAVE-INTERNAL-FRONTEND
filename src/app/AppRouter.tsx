@@ -4,7 +4,7 @@ import { staffApi } from "../lib/api"
 import { mapSession, toApiMode } from "../lib/mappers"
 import { storageKeys, useAuth } from "../context/AuthContext"
 import { useBranchData } from "../context/BranchDataContext"
-import { Button } from "../components/ui"
+import { ErrorNotice } from "../components/ui"
 import type { CloseSessionPayload } from "../types/api"
 
 // Auth
@@ -337,7 +337,7 @@ export default function AppRouter() {
           </div>
         }
       >
-        <AdminDashboard onLogout={logout} />
+        <AdminDashboard onLogout={logout} theme={theme} onThemeToggle={toggleTheme} />
       </Suspense>
     )
   }
@@ -357,16 +357,20 @@ export default function AppRouter() {
 
   if (ready && dataError && stylists.length === 0) {
     return (
-      <div className="flex flex-col h-full bg-[var(--bg)] items-center justify-center gap-5 px-8 text-center">
-        <div className="text-sm text-[#E06060]">{dataError}</div>
-        <div className="flex gap-3">
-          <Button variant="primary" onClick={() => void refresh()}>
-            Retry
-          </Button>
-          <Button variant="secondary" onClick={logout}>
-            Log out
-          </Button>
-        </div>
+      <div className="flex flex-col h-full bg-[var(--bg)] items-center justify-center px-6">
+        <ErrorNotice
+          className="w-full max-w-md"
+          message={dataError}
+          onRetry={() => void refresh()}
+          extra={
+            <button
+              onClick={logout}
+              className="inline-flex h-11 w-full shrink-0 items-center justify-center whitespace-nowrap rounded-xl border border-[var(--border)] px-6 font-display text-sm font-700 uppercase tracking-wider text-[var(--text-secondary)] sm:w-auto sm:min-w-[9rem]"
+            >
+              Log out
+            </button>
+          }
+        />
       </div>
     )
   }

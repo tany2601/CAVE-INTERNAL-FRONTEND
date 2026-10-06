@@ -7,6 +7,7 @@ import {
   Plus,
   Power,
   Save,
+  Trash2,
 } from "lucide-react"
 import { Input, PhoneInput } from "../../../components/ui"
 import { isValidPhone, sanitizePhone } from "../../../lib/phone"
@@ -240,6 +241,26 @@ export function BranchManagementView() {
                       }
                     >
                       <Power size={15} />
+                    </button>
+                    <button
+                      className="admin-danger-icon"
+                      aria-label={`Delete ${branch.name}`}
+                      onClick={() =>
+                        actions.request({
+                          title: `Delete ${branch.name}?`,
+                          message:
+                            "This permanently removes the branch, its PINs and menu. It only works for branches that have no sessions, payments or staff. Otherwise, deactivate it to keep the history.",
+                          confirmLabel: "Delete branch",
+                          destructive: true,
+                          action: async () => {
+                            await adminApi.deleteBranch(branch.id)
+                            await reload()
+                          },
+                          successMessage: `${branch.name} deleted`,
+                        })
+                      }
+                    >
+                      <Trash2 size={15} />
                     </button>
                   </div>
                 </div>

@@ -8,10 +8,12 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Moon,
   Package,
   RefreshCw,
   ReceiptText,
   Settings,
+  Sun,
   Tags,
   UserCheck,
   UserRound,
@@ -49,6 +51,8 @@ import {
 
 interface Props {
   onLogout: () => void
+  theme: "dark" | "light"
+  onThemeToggle: () => void
 }
 
 interface AdminNavGroup {
@@ -109,7 +113,7 @@ const navGroups: AdminNavGroup[] = [
   },
 ]
 
-export default function AdminDashboard({ onLogout }: Props) {
+export default function AdminDashboard({ onLogout, theme, onThemeToggle }: Props) {
   const adminActions = useAdminActions()
   const [section, setSection] = useState<AdminSection>(() => {
     try {
@@ -169,6 +173,14 @@ export default function AdminDashboard({ onLogout }: Props) {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            className="admin-icon-button"
+            aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+            title="Toggle theme"
+            onClick={onThemeToggle}
+          >
+            {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
           <button
             className="admin-icon-button"
             aria-label="Refresh data"

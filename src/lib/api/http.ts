@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "../../config/env"
+import { friendlyMessage } from "../errors"
 
 export class ApiError extends Error {
   status: number
@@ -70,7 +71,7 @@ export async function request<T>(
             : JSON.stringify(body),
     })
   } catch {
-    throw new ApiError(0, "Cannot reach the server. Check your connection.")
+    throw new ApiError(0, friendlyMessage(0))
   }
 
   const text = await res.text()
@@ -85,10 +86,7 @@ export async function request<T>(
 
   if (!res.ok) {
     if (res.status === 401 && auth && unauthorizedHandler) unauthorizedHandler()
-    throw new ApiError(
-      res.status,
-      extractMessage(payload, `Request failed (${res.status})`),
-    )
+    throw new ApiError(res.status, friendlyMessage(res.status, extractMessage(payload, "")))
   }
   return payload as T
 }
