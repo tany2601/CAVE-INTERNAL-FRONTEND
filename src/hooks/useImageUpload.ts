@@ -2,7 +2,7 @@ import { useState } from "react"
 import { adminApi } from "../lib/api"
 
 /** Uploads a picked image to Supabase Storage (via the backend) and reports its URL. */
-export function useImageUpload(folder: "staff" | "branches" | "products") {
+export function useImageUpload(folder: "staff" | "branches" | "products" | "offers") {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 

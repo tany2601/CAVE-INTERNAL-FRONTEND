@@ -86,7 +86,21 @@ export async function request<T>(
 
   if (!res.ok) {
     if (res.status === 401 && auth && unauthorizedHandler) unauthorizedHandler()
-    throw new ApiError(res.status, friendlyMessage(res.status, extractMessage(payload, "")))
+    throw new ApiError(res.status, friendlyMessage(res.status, extractMessage(payload, ""), !auth))
   }
   return payload as T
+}
+
+/** GET a binary file (e.g. the bill picture) with the sign-in token. */
+export async function requestBlob(path: string): Promise<Blob> {
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE_URL}${path}`, {
+      headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+    })
+  } catch {
+    throw new ApiError(0, friendlyMessage(0))
+  }
+  if (!res.ok) throw new ApiError(res.status, friendlyMessage(res.status))
+  return res.blob()
 }

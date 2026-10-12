@@ -36,7 +36,7 @@ export default function StylistSelection({
       {/* Header */}
       <div className="px-5 pt-page pb-5 border-b border-[var(--border-subtle)] flex-shrink-0">
         <button
-          className="text-[10px] tracking-[0.25em] uppercase text-[var(--text-muted)] mb-4 tap-target"
+          className="text-[10px] tracking-[0.25em] uppercase text-[var(--text-muted)] mb-4 tap-target touch-link"
           onClick={onBack}
         >
           ← Back

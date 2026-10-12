@@ -1,4 +1,5 @@
 import { EmptyNote } from "../../../components/ui"
+import { greeting } from "../../../lib/greeting"
 import {
   Activity,
   ArrowRight,
@@ -55,7 +56,7 @@ export function Overview({
         eyebrow={branches.length ? `Live across ${branches.length} ${branches.length === 1 ? "branch" : "branches"}` : "Live across all branches"}
         title={
           <>
-            Good day,
+            {greeting()},
             <br className="sm:hidden" /> {adminName}
           </>
         }

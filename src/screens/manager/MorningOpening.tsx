@@ -1,23 +1,26 @@
 import { useState } from "react"
 import { Button, Logo } from "../../components/ui"
+import { dayKeyOf, greeting, longDate } from "../../lib/greeting"
 
 interface Props {
   onSave: (cashBalance: number, gpayBalance: number) => Promise<void> | void
   onSkip: () => void
+  /** Day being recorded (YYYY-MM-DD). Today when left out; an earlier day when catching up. */
+  date?: string
+  /** Pre-fill when correcting a balance that was already entered. */
+  initialCash?: number
+  initialGpay?: number
 }
 
-export default function MorningOpening({ onSave, onSkip }: Props) {
-  const [cash, setCash] = useState("")
-  const [gpay, setGpay] = useState("")
+export default function MorningOpening({ onSave, onSkip, date, initialCash, initialGpay }: Props) {
+  const [cash, setCash] = useState(initialCash ? String(initialCash) : "")
+  const [gpay, setGpay] = useState(initialGpay ? String(initialGpay) : "")
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const now = new Date()
-  const dateStr = now.toLocaleDateString("en-IN", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  })
+  const today = dayKeyOf()
+  const isToday = !date || date === today
+  const dateStr = longDate(date ?? today)
 
   return (
     <div className="fixed inset-0 z-50 bg-[var(--bg)] flex flex-col overflow-y-auto animate-slide-up">
@@ -31,7 +34,7 @@ export default function MorningOpening({ onSave, onSkip }: Props) {
         }}
       />
 
-      <div className="relative z-10 flex flex-col min-h-full gap-8 px-6 pt-page-fluid pb-[max(1.5rem,env(safe-area-inset-bottom))] justify-between">
+      <div className="relative z-10 flex flex-col min-h-full gap-8 px-6 pt-page-fluid pb-[max(1.5rem,var(--sab))] justify-between">
         <div className="flex flex-col gap-8">
           <div className="flex flex-col gap-2">
             <Logo size="sm" />
@@ -42,10 +45,12 @@ export default function MorningOpening({ onSave, onSkip }: Props) {
 
           <div className="flex flex-col gap-2">
             <h1 className="font-display font-800 text-4xl tracking-wider text-[var(--text)]">
-              Good morning
+              {isToday ? greeting() : "Opening balance"}
             </h1>
             <p className="text-sm text-[var(--text-muted)] leading-relaxed">
-              Start the day by confirming your opening balances.
+              {isToday
+                ? "Start the day by confirming your opening balances."
+                : `This is the opening cash and GPay for ${dateStr}, which was not recorded on the day.`}
             </p>
           </div>
 
@@ -108,14 +113,12 @@ export default function MorningOpening({ onSave, onSkip }: Props) {
               try {
                 await onSave(Number(cash) || 0, Number(gpay) || 0)
               } catch (e) {
-                setError(
-                  e instanceof Error ? e.message : "Could not save the balances.",
-                )
+                setError(e instanceof Error ? e.message : "Could not save the balances.")
                 setSaving(false)
               }
             }}
           >
-            {saving ? "Saving…" : "Save & Start Day"}
+            {saving ? "Saving…" : isToday ? "Save & Start Day" : "Save opening balance"}
           </Button>
           <Button variant="ghost" fullWidth size="md" onClick={onSkip}>
             Skip for now

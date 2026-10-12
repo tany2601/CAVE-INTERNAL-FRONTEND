@@ -51,7 +51,7 @@ export default function Performance({ onNav, navTab }: Props) {
         <div className="px-5 pt-page pb-5 border-b border-[var(--border-subtle)]">
           {selected ? (
             <button
-              className="flex items-center gap-2 text-[10px] tracking-[0.2em] uppercase text-[var(--text-muted)] mb-3"
+              className="touch-link gap-2 text-[10px] tracking-[0.2em] uppercase text-[var(--text-muted)] mb-3"
               onClick={() => setSelectedId(null)}
             >
               <ArrowLeft size={13} /> All stylists

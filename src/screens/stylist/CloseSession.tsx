@@ -1,7 +1,11 @@
 import { useRef, useState } from "react"
 import { Session, Service } from "../../types"
-import { Button, SectionLabel, AmountRow, Select, ServiceTile } from "../../components/ui"
+import { Button, SectionLabel, AmountRow, Select, ServiceTile, PhoneInput } from "../../components/ui"
+import { isValidPhone, sanitizePhone } from "../../lib/phone"
+import { billNo, billText, whatsappLink } from "../../lib/billText"
 import { formatAmount } from "../../lib/format"
+import { round2, sumMoney } from "../../lib/money"
+import { freeHaircutIndex } from "../../lib/loyalty"
 import { useBranchData } from "../../context/BranchDataContext"
 import { X, Plus, Minus, Check } from "lucide-react"
 
@@ -16,8 +20,12 @@ interface Props {
     discount: number
     discountType: "amount" | "percent"
     discountValue: number
-  }) => Promise<void> | void
+    /** 10-digit WhatsApp number typed at billing, when the customer had none saved. */
+    whatsappTo?: string
+  }) => Promise<{ id: string } | void> | { id: string } | void
   onCancel: () => void
+  /** Sell products only: no services, and no stylist or customer to bill. */
+  productOnly?: boolean
 }
 
 interface Product {
@@ -27,7 +35,7 @@ interface Product {
   qty: number
 }
 
-export default function CloseSession({ session, onComplete, onCancel }: Props) {
+export default function CloseSession({ session, onComplete, onCancel, productOnly = false }: Props) {
   const { services: SERVICES, products: checkoutProducts, getStylist } =
     useBranchData()
   // Retail products managed by admins (Admin → Products).
@@ -63,6 +71,9 @@ export default function CloseSession({ session, onComplete, onCancel }: Props) {
     session.discountType ?? "percent",
   )
   const stylist = getStylist(session.stylistId)
+  const { whatsapp: waSettings, branchName } = useBranchData()
+  const waMode = waSettings.mode
+  const [whatsapp, setWhatsapp] = useState("")
 
   // Anything selected that isn't on the branch menu is a one-off custom service.
   const menuIds = new Set(SERVICES.map((service) => service.id))
@@ -91,23 +102,29 @@ export default function CloseSession({ session, onComplete, onCancel }: Props) {
     )
   }
 
-  const serviceTotal = selectedServices.reduce(
-    (sum, service) => sum + service.price,
-    0,
+  // Same arithmetic as the server (paise-exact), so the bill shown here is the bill that gets saved.
+  // Menu items are billed at today's menu price. On the customer's free (6th) visit the cheapest
+  // haircut is ₹0, which also applies when a manager adds it later while editing the bill.
+  const menuPrice = new Map(SERVICES.map((service) => [service.id, service.price]))
+  const pricedServices = selectedServices.map((service) => ({
+    ...service,
+    price: menuPrice.get(service.id) ?? service.price,
+  }))
+  const freeIndex =
+    session.freeVisit && !productOnly
+      ? freeHaircutIndex(pricedServices.map((s) => (menuIds.has(s.id) ? s : { name: "", price: s.price })))
+      : -1
+  const billServices = pricedServices.map((service, index) =>
+    index === freeIndex ? { ...service, price: 0 } : service,
   )
-  const productTotal = products.reduce(
-    (sum, product) => sum + product.price * product.qty,
-    0,
-  )
-  const subtotal = serviceTotal + productTotal
+  const serviceTotal = sumMoney(billServices.map((service) => service.price))
+  const productTotal = sumMoney(products.map((product) => product.price * product.qty))
+  const subtotal = round2(serviceTotal + productTotal)
   const discount =
     discountMode === "percent"
-      ? Math.min(
-          subtotal,
-          Math.round((subtotal * Math.min(discountValue, 100)) / 100),
-        )
-      : Math.min(subtotal, discountValue)
-  const total = Math.max(0, subtotal - discount + tip)
+      ? Math.min(subtotal, round2((subtotal * Math.min(discountValue, 100)) / 100))
+      : Math.min(subtotal, round2(discountValue))
+  const total = Math.max(0, round2(subtotal - discount + tip))
 
   const updateCatalogProduct = (product: Product) => {
     setProducts((current) => {
@@ -136,10 +153,10 @@ export default function CloseSession({ session, onComplete, onCancel }: Props) {
       <div className="flex items-center justify-between px-5 pt-page pb-4 border-b border-[var(--border-subtle)]">
         <div>
           <div className="font-display font-800 tracking-wider uppercase text-base text-[var(--text)]">
-            {editing ? "Edit session" : "Complete session"}
+            {productOnly ? "Sell products" : editing ? "Edit session" : "Complete session"}
           </div>
           <div className="text-[10px] text-[var(--text-muted)] mt-0.5">
-            {session.customerName} · {stylist ? `with ${stylist.name}` : "No stylist assigned"}
+            {productOnly ? "Products only · no services" : `${session.customerName} · ${stylist ? `with ${stylist.name}` : "No stylist assigned"}`}
           </div>
         </div>
         <button
@@ -152,6 +169,20 @@ export default function CloseSession({ session, onComplete, onCancel }: Props) {
 
       <div className="flex-1 overflow-y-auto">
         <div className="px-5 py-5 flex flex-col gap-7">
+          {!productOnly && (
+            <>
+          {session.freeVisit && (
+            <div
+              role="status"
+              className="border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-xs leading-relaxed text-[var(--text-secondary)]"
+            >
+              <span className="font-display font-700 uppercase tracking-wider text-[var(--text)]">Free visit</span>
+              {" · "}
+              {freeIndex >= 0
+                ? `The haircut is on us (${formatAmount(0)}). Everything else is charged as usual.`
+                : "This is the customer's free visit. Add a Haircut and it bills at ₹0."}
+            </div>
+          )}
           <div>
             <SectionLabel>Most selected</SectionLabel>
             <div className="flex gap-2 overflow-x-auto pb-1">
@@ -253,6 +284,9 @@ export default function CloseSession({ session, onComplete, onCancel }: Props) {
               )}
             </div>
           </div>
+
+            </>
+          )}
 
           <div>
             <SectionLabel>Add products</SectionLabel>
@@ -480,11 +514,30 @@ export default function CloseSession({ session, onComplete, onCancel }: Props) {
             </div>
           </div>
 
-          <div className="text-[11px] text-[var(--text-subtle)]">
-            {session.customerPhone
-              ? `Bill will be sent to ${session.customerPhone} via WhatsApp.`
-              : "No WhatsApp number is saved for this customer."}
-          </div>
+          {!editing && (
+            <div>
+              <SectionLabel>WhatsApp bill</SectionLabel>
+              {session.customerPhone ? (
+                <div className="text-[11px] leading-relaxed text-[var(--text-subtle)]">
+                  The bill will be sent to {session.customerPhone} on WhatsApp when you close it.
+                </div>
+              ) : (
+                <>
+                  <PhoneInput
+                    value={whatsapp}
+                    onChange={setWhatsapp}
+                    placeholder="Customer's WhatsApp number (optional)"
+                    className="w-full bg-[var(--surface)] border border-[var(--border)] px-4 py-3 text-[var(--text)] outline-none"
+                  />
+                  <div className="mt-2 text-[11px] leading-relaxed text-[var(--text-subtle)]">
+                    {whatsapp.length === 10
+                      ? `The bill will be sent to +91 ${whatsapp} on WhatsApp.`
+                      : "Add a number to send the bill on WhatsApp, or leave it empty."}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -497,13 +550,23 @@ export default function CloseSession({ session, onComplete, onCancel }: Props) {
         <Button
           fullWidth
           size="lg"
-          disabled={selectedServices.length === 0 || customInvalid || submitting}
+          disabled={
+            (productOnly ? products.length === 0 || subtotal <= 0 : selectedServices.length === 0) ||
+            customInvalid ||
+            submitting
+          }
           onClick={async () => {
             setSubmitting(true)
             setSubmitError(null)
+            // Manual WhatsApp mode: browsers only let a tap open a new window, and billing takes a moment,
+            // so a blank window is opened right now and pointed at the customer's chat once the bill is saved.
+            const savedNumber = sanitizePhone(session.customerPhone ?? "")
+            const chatNumber = isValidPhone(savedNumber) ? savedNumber : whatsapp
+            const chatWindow =
+              waMode === "manual" && !editing && isValidPhone(chatNumber) ? window.open("", "_blank") : null
             try {
-              await onComplete({
-                services: selectedServices,
+              const closed = await onComplete({
+                services: billServices,
                 tip,
                 tipMode,
                 paymentMode,
@@ -511,8 +574,28 @@ export default function CloseSession({ session, onComplete, onCancel }: Props) {
                 discount,
                 discountType: discountMode,
                 discountValue,
+                whatsappTo: !session.customerPhone && isValidPhone(whatsapp) ? whatsapp : undefined,
               })
+              if (chatWindow) {
+                const link = whatsappLink(
+                  chatNumber,
+                  billText({
+                    customerName: session.customerName,
+                    branchName,
+                    services: billServices,
+                    products,
+                    discountAmount: discount,
+                    tip,
+                    total,
+                    paymentMode,
+                    billNo: billNo(closed?.id ?? session.id),
+                  }),
+                )
+                if (link) chatWindow.location.href = link
+                else chatWindow.close()
+              }
             } catch (e) {
+              chatWindow?.close()
               setSubmitError(
                 e instanceof Error ? e.message : "Could not close the session.",
               )
@@ -526,7 +609,9 @@ export default function CloseSession({ session, onComplete, onCancel }: Props) {
               : "Closing…"
             : editing
               ? `Save changes · ${formatAmount(total)}`
-              : `Close & send ${formatAmount(total)} bill`}
+              : productOnly
+                ? `Bill ${formatAmount(total)}`
+                : `Close & send ${formatAmount(total)} bill`}
         </Button>
       </div>
     </div>

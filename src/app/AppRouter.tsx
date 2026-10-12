@@ -5,6 +5,7 @@ import { mapSession, toApiMode } from "../lib/mappers"
 import { storageKeys, useAuth } from "../context/AuthContext"
 import { useBranchData } from "../context/BranchDataContext"
 import { ErrorNotice } from "../components/ui"
+import { BooksPrompter } from "../components/BooksPrompter"
 import type { CloseSessionPayload } from "../types/api"
 
 // Auth
@@ -55,6 +56,21 @@ interface SuccessData {
   paymentMode: "cash" | "gpay"
 }
 
+/** Screens that ignore the light theme: sign-in and the customer check-in flow. */
+const ALWAYS_DARK: AppScreen[] = [
+  "role-selection",
+  "stylist-pin-entry",
+  "manager-pin-entry",
+  "welcome",
+  "customer-name",
+  "customer-phone",
+  "customer-services",
+  "loyalty",
+  "stylist-selection",
+  "session-ready",
+  "manager-entry",
+]
+
 const PRE_LOGIN_SCREENS: AppScreen[] = [
   "role-selection",
   "stylist-pin-entry",
@@ -88,6 +104,7 @@ const buildBillPayload = (
     ),
     tipAmount: data.tip,
     paymentMode: toApiMode(data.paymentMode),
+    ...(data.whatsappTo ? { whatsappTo: data.whatsappTo } : {}),
   }
   if (data.discountValue > 0) {
     payload.discountType = data.discountType === "percent" ? "PERCENTAGE" : "FIXED"
@@ -136,7 +153,18 @@ const initialScreen = (role: string | undefined): AppScreen => {
   return manager ? "manager-entry" : "welcome"
 }
 
+/** The screens plus the manager's books prompts, which need to know which screen is showing. */
 export default function AppRouter() {
+  const [screenName, setScreenName] = useState("")
+  return (
+    <>
+      <AppScreens onScreen={setScreenName} />
+      <BooksPrompter screen={screenName} />
+    </>
+  )
+}
+
+function AppScreens({ onScreen }: { onScreen: (screen: string) => void }) {
   const { auth, signOut } = useAuth()
   const { ready, error: dataError, refresh, stylists, day, services, addActiveSession } =
     useBranchData()
@@ -151,6 +179,8 @@ export default function AppRouter() {
   const [pickedServices, setPickedServices] = useState<string[]>([])
   const [closingSession, setClosingSession] = useState<Session | null>(null)
   const [editingSession, setEditingSession] = useState<Session | null>(null)
+  /** True while the open bill is a products-only sale (no session exists until it is billed). */
+  const [productOnly, setProductOnly] = useState(false)
   const [sessionSuccess, setSessionSuccess] = useState<SuccessData | null>(null)
   const [startingSession, setStartingSession] = useState(false)
   const [startError, setStartError] = useState<string | null>(null)
@@ -165,13 +195,17 @@ export default function AppRouter() {
     localStorage.getItem("cave-theme") === "light" ? "light" : "dark",
   )
 
+  // The light theme is only for the dashboards; sign-in and customer check-in are always dark.
+  const applied = ALWAYS_DARK.includes(screen) ? "dark" : theme
   useEffect(() => {
-    document.documentElement.dataset.theme = theme
-    localStorage.setItem("cave-theme", theme)
+    document.documentElement.dataset.theme = applied
     // Status bar / browser chrome colour of the installed app follows the theme.
     document
       .querySelector('meta[name="theme-color"]')
-      ?.setAttribute("content", theme === "dark" ? "#090909" : "#f7f7f5")
+      ?.setAttribute("content", applied === "dark" ? "#090909" : "#f7f7f5")
+  }, [applied])
+  useEffect(() => {
+    localStorage.setItem("cave-theme", theme)
   }, [theme])
 
   // The admin area uses the full screen; every other screen sits in the phone-width frame.
@@ -194,13 +228,13 @@ export default function AppRouter() {
     }
   }, [auth, screen])
 
-  // After a manager signs in, wait for today's data, then ask for the opening
-  // balance only if it has not been recorded yet.
+  useEffect(() => onScreen(screen), [screen, onScreen])
+
+  // After a manager signs in, wait for today's data and go to the start screen. The books prompts
+  // (opening balance, closing balance, forgotten days) are shown over it by <BooksPrompter>.
   useEffect(() => {
-    if (screen === "manager-entry" && ready) {
-      setScreen(day?.openingSet || day?.closed ? "welcome" : "morning-opening")
-    }
-  }, [screen, ready, day])
+    if (screen === "manager-entry" && ready) setScreen("welcome")
+  }, [screen, ready])
 
   // Session expired (401) or signed out elsewhere: fall back to the role picker.
   useEffect(() => {
@@ -240,6 +274,7 @@ export default function AppRouter() {
   }
 
   const handleCloseSession = (session: Session) => {
+    setProductOnly(false)
     setClosingSession(session)
     nav("close-session")
   }
@@ -402,8 +437,18 @@ export default function AppRouter() {
             : handleStylistNav("home")
         }
         onQuickBill={handleCloseSession}
-        theme={theme}
-        onThemeToggle={toggleTheme}
+        onProductSale={() => {
+          setProductOnly(true)
+          setClosingSession({
+            id: "",
+            customerName: "Product sale",
+            stylistId: "",
+            startTime: new Date(),
+            services: [],
+            status: "active",
+          })
+          nav("close-session")
+        }}
       />
     )
   }
@@ -504,12 +549,29 @@ export default function AppRouter() {
     return (
       <CloseSession
         session={closingSession}
+        productOnly={productOnly}
         onComplete={async (data) => {
           const payload = buildBillPayload(
             data,
             new Set(services.map((s) => s.id)),
           )
-          const closed = await staffApi.closeSession(closingSession.id, payload)
+          // A products-only sale has no session yet: open one (no stylist, no customer), then bill it.
+          const sessionId = productOnly
+            ? (
+                await staffApi.createSession({
+                  customerName: closingSession.customerName,
+                  startNow: true,
+                })
+              ).id
+            : closingSession.id
+          let closed
+          try {
+            closed = await staffApi.closeSession(sessionId, payload)
+          } catch (e) {
+            // Don't leave an empty "Product sale" hanging in Active Now if billing failed.
+            if (productOnly) await staffApi.deleteSession(sessionId).catch(() => undefined)
+            throw e
+          }
           setSessionSuccess({
             total: closed.totalAmount,
             paymentMode: data.paymentMode,
@@ -517,10 +579,17 @@ export default function AppRouter() {
           setClosingSession(mapSession(closed))
           void refresh()
           nav("session-success" as AppScreen)
+          return { id: closed.id }
         }}
-        onCancel={() =>
+        onCancel={() => {
+          if (productOnly) {
+            setProductOnly(false)
+            setClosingSession(null)
+            nav("welcome")
+            return
+          }
           nav(role === "manager" ? "manager-sessions" : "stylist-home")
-        }
+        }}
       />
     )
   }
@@ -536,8 +605,14 @@ export default function AppRouter() {
         total={sessionSuccess.total}
         paymentMode={sessionSuccess.paymentMode}
         onDone={() => {
+          const wasProductSale = productOnly
+          setProductOnly(false)
           setClosingSession(null)
           setSessionSuccess(null)
+          if (wasProductSale) {
+            nav("welcome")
+            return
+          }
           nav(role === "manager" ? "manager-sessions" : "stylist-home")
         }}
       />

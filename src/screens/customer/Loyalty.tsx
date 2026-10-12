@@ -102,7 +102,7 @@ export default function Loyalty({ customer, onContinue, onCancel }: Props) {
 
           <div className="border-t border-[var(--border-subtle)] mt-5 pt-4 text-center text-xs text-[var(--text-secondary)]">
             {customer.rewardReady
-              ? "Your free haircut is ready to redeem."
+              ? "Your next haircut is free!"
               : `${visits}/${customer.loyaltyTarget} — ${remaining} more visit${
                   remaining === 1 ? "" : "s"
                 } for a free haircut.`}

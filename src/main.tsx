@@ -5,6 +5,13 @@ import './index.css'
 import { installHaptics } from './lib/haptics'
 
 installHaptics()
+try {
+  // Leftovers from the removed layout-test panel.
+  localStorage.removeItem('cave-fix')
+  localStorage.removeItem('cave-viewport')
+} catch {
+  // ignore
+}
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
@@ -39,4 +46,18 @@ if (splash) {
   }
   if (seen) splash.remove()
   else window.setTimeout(dismiss, 3500)
+}
+
+// Home-indicator padding for installed iOS apps (see --sab in index.css): iPhones with a notch
+// reserve 34px, iPads 20px. Android and browsers keep env(safe-area-inset-bottom).
+{
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  const standalone =
+    window.matchMedia('(display-mode: standalone)').matches ||
+    (navigator as Navigator & { standalone?: boolean }).standalone === true
+  if (ios && standalone) {
+    const long = Math.max(screen.width, screen.height)
+    const tablet = Math.min(screen.width, screen.height) >= 700
+    document.documentElement.style.setProperty('--sab', tablet ? '20px' : long >= 812 ? '34px' : '0px')
+  }
 }

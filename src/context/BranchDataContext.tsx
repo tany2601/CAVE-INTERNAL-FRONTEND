@@ -41,6 +41,8 @@ interface BranchData {
   payouts: ApiPayout[]
   /** Today's opening / closing balance state. */
   day: ApiDay | null
+  /** How closed bills reach customers (set by the admin in Settings). */
+  whatsapp: { mode: "off" | "api" | "manual"; billFormat: "text" | "image" }
   getStylist: (id: string) => Stylist | undefined
   refresh: () => Promise<void>
   /** Show a just-created session straight away, before the next refresh confirms it. */
@@ -62,6 +64,7 @@ const EMPTY: Omit<
   expenses: [],
   payouts: [],
   day: null,
+  whatsapp: { mode: "off", billFormat: "text" },
 }
 
 /** Loads and keeps fresh the branch-scoped data the stylist/manager screens render. */
@@ -101,6 +104,7 @@ export function BranchDataProvider({ children }: { children: ReactNode }) {
         expenses: today.expenses.map(mapExpense),
         payouts: today.payouts,
         day: today.day,
+        whatsapp: today.whatsapp ?? { mode: "off", billFormat: "text" },
       }))
       setError(null)
     } catch (e) {

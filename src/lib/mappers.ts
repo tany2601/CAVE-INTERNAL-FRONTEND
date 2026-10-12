@@ -31,6 +31,8 @@ export const mapSession = (s: ApiSession): Session => ({
   })),
   status: s.status === "COMPLETED" ? "closed" : "active",
   total: s.status === "COMPLETED" ? s.totalAmount : undefined,
+  subtotal: s.status === "COMPLETED" ? s.subtotal : undefined,
+  discountAmount: s.status === "COMPLETED" ? s.discountAmount : undefined,
   paymentMode: mode(s.paymentMode),
   tip: s.tipAmount || undefined,
   // The backend records one payment mode per bill, so the tip follows it.
@@ -53,6 +55,7 @@ export const mapSession = (s: ApiSession): Session => ({
         : undefined,
   discountValue: s.discountValue || undefined,
   isEdited: s.isEdited,
+  freeVisit: s.isFreeVisit || undefined,
 })
 
 export const mapStylist = (s: ApiStylist): Stylist => ({

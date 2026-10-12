@@ -1,4 +1,4 @@
-import { request } from "./http"
+import { request, requestBlob } from "./http"
 import type {
   ApiCheckoutProduct,
   ApiChecklistItem,
@@ -64,11 +64,22 @@ export const getStats = (period: "TODAY" | "THIS_WEEK" | "THIS_MONTH") =>
     query: { period },
   }).then((r) => r.stylists)
 
-export const setOpeningBalance = (cash: number, gpay: number) =>
-  request<ApiDay>("PUT", "/staff/day/opening", { body: { cash, gpay } })
+/** `date` (YYYY-MM-DD) records an earlier day instead of today. */
+export const setOpeningBalance = (cash: number, gpay: number, date?: string) =>
+  request<ApiDay>("PUT", "/staff/day/opening", { body: { cash, gpay, ...(date ? { date } : {}) } })
 
-export const closeDay = (actualCash: number, actualGpay: number) =>
-  request<ApiDay>("POST", "/staff/day/close", { body: { actualCash, actualGpay } })
+export const closeDay = (actualCash: number, actualGpay: number, date?: string) =>
+  request<ApiDay>("POST", "/staff/day/close", { body: { actualCash, actualGpay, ...(date ? { date } : {}) } })
+
+/** One day's books with the live expected balances (today when `date` is left out). */
+export const getDay = (date?: string) => request<ApiDay>("GET", "/staff/day", { query: { date } })
+
+/** Recent days whose opening or closing was never recorded. */
+export const getPendingDays = () =>
+  request<{ data: { date: string; openingMissing: boolean; closingMissing: boolean }[] }>(
+    "GET",
+    "/staff/day/pending",
+  ).then((r) => r.data)
 
 export const createPayout = (body: {
   userId: string
@@ -93,6 +104,13 @@ export const editSession = (sessionId: string, body: CloseSessionPayload) =>
 
 export const deleteSession = (sessionId: string) =>
   request<{ message: string }>("DELETE", `/staff/sessions/${sessionId}`)
+
+/** Where this bill's WhatsApp message stands. */
+export const getBillWhatsapp = (sessionId: string) =>
+  request<{ status: "none" | "PENDING" | "SENT" | "FAILED" }>("GET", `/staff/sessions/${sessionId}/whatsapp`).then((r) => r.status)
+
+/** The closed bill as a branded picture (PNG). */
+export const getBillImage = (sessionId: string) => requestBlob(`/staff/sessions/${sessionId}/bill-image`)
 
 export const getProducts = () =>
   request<{ data: ApiCheckoutProduct[] }>("GET", "/staff/products").then((r) => r.data)

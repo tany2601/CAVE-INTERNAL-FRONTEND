@@ -3,6 +3,7 @@ import { StylistNav } from "../../components/layout"
 import { SectionLabel } from "../../components/ui"
 import { StylistStats } from "../../components/StylistStats"
 import { formatDuration, formatAmount, formatMinutes, sessionMinutes } from "../../lib/format"
+import { sumMoney } from "../../lib/money"
 import { useBranchData } from "../../context/BranchDataContext"
 import { Session } from "../../types"
 import {
@@ -51,10 +52,7 @@ export default function StylistHome({
     (sum, stylist) => sum + stylist.completedToday,
     0,
   )
-  const totalRevenue = stylists.reduce(
-    (sum, stylist) => sum + stylist.revenueToday,
-    0,
-  )
+  const totalRevenue = sumMoney(stylists.map((stylist) => stylist.revenueToday))
 
   return (
     <div className="flex flex-col h-full bg-[var(--bg)]">
@@ -157,7 +155,7 @@ export default function StylistHome({
         ) : (
           <div className="px-5 py-5">
             <button
-              className="flex items-center gap-2 text-[10px] tracking-[0.2em] uppercase text-[var(--text-muted)] mb-6"
+              className="touch-link gap-2 text-[10px] tracking-[0.2em] uppercase text-[var(--text-muted)] mb-6"
               onClick={() => setSelectedStylist(null)}
             >
               <ArrowLeft size={13} /> All stylists

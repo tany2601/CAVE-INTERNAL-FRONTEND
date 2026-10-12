@@ -278,7 +278,7 @@ export default function AdminDashboard({ onLogout, theme, onThemeToggle }: Props
             )
           })}
         </nav>
-        <div className="shrink-0 px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-[var(--border-subtle)]">
+        <div className="shrink-0 px-4 pt-4 pb-[max(1rem,var(--sab))] border-t border-[var(--border-subtle)]">
           <div className="rounded-xl bg-[var(--surface)] border border-[var(--border-subtle)] p-3">
             <div className="text-xs font-600">{profile.data?.name ?? "Admin"}</div>
             <div className="text-[10px] text-[var(--text-muted)] mt-0.5">

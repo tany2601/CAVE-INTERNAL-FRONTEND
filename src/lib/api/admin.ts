@@ -1,4 +1,4 @@
-import { request } from "./http"
+import { request, requestBlob } from "./http"
 import type {
   ApiProduct,
   ApiProductSummary,
@@ -194,6 +194,9 @@ export interface RevenueSummary {
   revenue: number
   cashCollected: number
   gpayCollected: number
+  /** Commission and tips handed to staff in the period. */
+  commissionPaid: number
+  tipWithdrawals: number
   byBranch: { branchId: string; name: string; collected: number; sessions: number }[]
 }
 
@@ -267,7 +270,7 @@ export const deleteChecklistTask = (id: string) =>
 export const getAdminProfile = () => request<AdminProfile>("GET", "/admin/auth/me")
 
 /** Uploads a staff / branch photo to Supabase Storage and returns its public URL. */
-export const uploadImage = (file: File, folder: "staff" | "branches" | "products") => {
+export const uploadImage = (file: File, folder: "staff" | "branches" | "products" | "offers") => {
   const form = new FormData()
   form.append("file", file)
   return request<{ url: string }>("POST", "/admin/uploads/image", {
@@ -275,6 +278,101 @@ export const uploadImage = (file: File, folder: "staff" | "branches" | "products
     query: { folder },
   }).then((r) => r.url)
 }
+
+// ── WhatsApp ─────────────────────────────────────────────────────────
+export type WhatsappMode = "off" | "api" | "manual"
+
+export interface WhatsappStatus {
+  /** True once the server has its WhatsApp keys; nothing can be sent before that. */
+  configured: boolean
+  /** How bills are sent: not at all, automatically (Business API), or by hand from the staff app. */
+  mode: WhatsappMode
+  billFormat: "text" | "image"
+  phones: string[]
+  daily: boolean
+  weekly: boolean
+  monthly: boolean
+  /** Send the full Excel report with each report message. */
+  excel: boolean
+  /** Sending is paused (WhatsApp complained, or the token failed); null when running normally. */
+  paused: { until: string; reason: string } | null
+  pausedScope: "all" | "offers" | null
+  /** The webhook is set up on the server, so delivery status and STOP replies work. */
+  webhookReady: boolean
+  suppressed: { optedOut: number; undeliverable: number }
+  offerLimit: { perDay: number; sentToday: number; minDaysBetween: number }
+  templates: { bill: string; report: string; billImage: string; offer: string; offerImage: string; reportFile: string }
+}
+
+export interface WhatsappMessageRow {
+  id: string
+  kind: "BILL" | "REPORT" | "TEST" | "OFFER"
+  status: "PENDING" | "SENT" | "FAILED"
+  to: string
+  attempts: number
+  error: string | null
+  errorCode: number | null
+  /** After WhatsApp accepted it: "delivered", "read" or "failed". */
+  deliveryStatus: "delivered" | "read" | "failed" | null
+  createdAt: string
+  sentAt: string | null
+}
+
+export const getWhatsapp = () => request<WhatsappStatus>("GET", "/admin/whatsapp")
+
+export const saveWhatsapp = (
+  body: Pick<WhatsappStatus, "phones" | "daily" | "weekly" | "monthly" | "excel" | "mode" | "billFormat">,
+) =>
+  request<WhatsappStatus>("PUT", "/admin/whatsapp", { body })
+
+/** Sends a report to the saved numbers now. `from`/`to` (YYYY-MM-DD) pick the period; today so far by default. */
+export const testWhatsapp = (range: { from?: string; to?: string } = {}) =>
+  request<{ queued: number }>("POST", "/admin/whatsapp/test", { body: range })
+
+/** The Excel report for a period, to check it without sending anything. */
+export const downloadWhatsappReport = (from: string, to: string) =>
+  requestBlob(`/admin/whatsapp/report?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)
+
+export interface WhatsappOfferRow {
+  id: string
+  message: string
+  imageUrl: string | null
+  branches: string[]
+  audience: number
+  sent: number
+  failed: number
+  waiting: number
+  createdAt: string
+}
+
+/** How many customers an offer to these branches (none = all) would reach. */
+export interface WhatsappAudience {
+  count: number
+  /** Left out because they replied STOP or can't receive WhatsApp. */
+  optedOut: number
+  /** Left out because they already got an offer recently. */
+  recentlyMessaged: number
+}
+
+export const whatsappAudience = (branchIds: string[]) =>
+  request<WhatsappAudience>("GET", "/admin/whatsapp/offers/audience", {
+    query: { branchIds: branchIds.join(",") },
+  })
+
+/** Start sending again after a pause, once the cause is fixed. */
+export const resumeWhatsapp = () => request<{ resumed: boolean }>("POST", "/admin/whatsapp/resume", { body: {} })
+
+export const sendWhatsappOffer = (body: { message: string; imageUrl?: string; branchIds: string[] }) =>
+  request<{ offerId: string; audience: number; queued: number }>("POST", "/admin/whatsapp/offers", { body })
+
+export const listWhatsappOffers = () =>
+  request<{ data: WhatsappOfferRow[] }>("GET", "/admin/whatsapp/offers").then((r) => r.data)
+
+export const retryFailedWhatsapp = () =>
+  request<{ requeued: number }>("POST", "/admin/whatsapp/messages/retry", { body: {} })
+
+export const listWhatsappMessages = () =>
+  request<{ data: WhatsappMessageRow[] }>("GET", "/admin/whatsapp/messages").then((r) => r.data)
 
 // ── Products ─────────────────────────────────────────────────────────
 export interface ProductInput {

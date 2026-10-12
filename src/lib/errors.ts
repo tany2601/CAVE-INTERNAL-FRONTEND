@@ -19,7 +19,13 @@ const TECHNICAL =
   /prisma|invocation|stack|undefined|\bnull\b|ECONN|ETIMEDOUT|SQL|constraint|relation|Unexpected|JSON|\bat \S+\(|Cannot (GET|POST|PUT|PATCH|DELETE)|Request failed|status code|Internal server|Bad Gateway|<html|\[object/i
 
 /** What to show for a failed request: status 0 means the request never reached the server. */
-export function friendlyMessage(status: number, serverMessage?: string): string {
+export function friendlyMessage(status: number, serverMessage?: string, signingIn = false): string {
+  // A 401 while signing in means a wrong PIN (or a lockout), not an expired session.
+  if (status === 401 && signingIn) {
+    return /too many/i.test(serverMessage ?? "")
+      ? "Too many failed attempts. Please wait a few minutes and try again."
+      : "Incorrect PIN. Try again."
+  }
   if (status === 0) {
     return typeof navigator !== "undefined" && navigator.onLine === false
       ? MESSAGES.offline

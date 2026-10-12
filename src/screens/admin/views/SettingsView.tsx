@@ -13,6 +13,8 @@ import { adminApi } from "../../../lib/api"
 import { useAsyncData } from "../../../hooks/useAsyncData"
 import { useAdminPinEditor, useRolePinEditor } from "../../../hooks/usePinEditors"
 import { PageHeading, Field, AdminSelect } from "../components"
+import { WhatsappPanel } from "../components/WhatsappPanel"
+import { OffersPanel } from "../components/OffersPanel"
 import { useAdminActions } from "../hooks/useAdminActions"
 
 /** PIN field that masks the digits until the eye is pressed. */
@@ -431,6 +433,8 @@ export const SettingsView = () => {
             </button>
           </section>
 
+          <WhatsappPanel />
+          <OffersPanel />
         </div>
       </div>
 

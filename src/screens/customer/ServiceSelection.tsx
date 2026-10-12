@@ -66,7 +66,7 @@ export default function ServiceSelection({
         )}
       </div>
 
-      <div className="px-6 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] border-t border-[var(--border-subtle)] flex flex-col gap-2 bg-[var(--bg)]">
+      <div className="px-6 pt-4 pb-[max(1.5rem,var(--sab))] border-t border-[var(--border-subtle)] flex flex-col gap-2 bg-[var(--bg)]">
         <Button
           variant="primary"
           fullWidth

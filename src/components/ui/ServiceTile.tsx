@@ -25,11 +25,16 @@ export function ServiceTile({
   selected: boolean
   onToggle: () => void
 }) {
+  // Combo names carry their contents in brackets: "The Basic (Haircut + …)". Show the name big and
+  // the contents small so the tile never has to cut text off.
+  const open = name.indexOf(" (")
+  const title = open > 0 && name.endsWith(")") ? name.slice(0, open) : name
+  const detail = open > 0 && name.endsWith(")") ? name.slice(open + 2, -1) : ""
   return (
     <button
       type="button"
       aria-pressed={selected}
-      className={`relative h-28 overflow-hidden text-left border transition-colors ${
+      className={`relative flex h-full min-h-28 flex-col justify-end overflow-hidden text-left border transition-colors ${
         selected ? "border-white" : "border-[var(--border-subtle)]"
       }`}
       onClick={onToggle}
@@ -47,8 +52,9 @@ export function ServiceTile({
           <Check size={13} />
         </div>
       )}
-      <div className="absolute bottom-0 left-0 right-0 p-3 text-white">
-        <div className="font-display font-700 tracking-wide">{name}</div>
+      <div className="relative p-3 pt-10 text-white">
+        <div className="font-display font-700 leading-tight tracking-wide">{title}</div>
+        {detail && <div className="mt-1 text-[10px] leading-snug text-white/70">{detail}</div>}
         <div className="text-xs text-white/65 mt-0.5">{formatAmount(price)}</div>
       </div>
     </button>

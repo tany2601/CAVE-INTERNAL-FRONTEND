@@ -4,10 +4,9 @@ import {
   Menu,
   ArrowRight,
   ReceiptText,
-  Moon,
-  Sun,
   X,
   Clock,
+  ShoppingBag,
 } from "lucide-react"
 import { Session } from "../../types"
 import { formatDuration } from "../../lib/format"
@@ -18,20 +17,19 @@ interface Props {
   onStart: () => void
   onMenu: () => void
   onQuickBill: (session: Session) => void
+  /** Sell products without any service (opens a products-only bill). */
+  onProductSale: () => void
   activeSessions: Session[]
   role: "stylist" | "manager"
-  theme: "dark" | "light"
-  onThemeToggle: () => void
 }
 
 export default function Welcome({
   onStart,
   onMenu,
   onQuickBill,
+  onProductSale,
   activeSessions,
   role,
-  theme,
-  onThemeToggle,
 }: Props) {
   const [showSessions, setShowSessions] = useState(false)
   const { getStylist, branchShort } = useBranchData()
@@ -49,7 +47,7 @@ export default function Welcome({
         className="absolute inset-0 z-1"
         style={{
           background:
-            "linear-gradient(to bottom, rgba(5,5,5,.78), rgba(5,5,5,.08) 42%, rgba(5,5,5,.96) 82%, #050505)",
+            "linear-gradient(to bottom, var(--bg), transparent 7rem), linear-gradient(to bottom, rgba(5,5,5,.78), rgba(5,5,5,.08) 42%, rgba(9,9,9,.96) 82%, var(--bg))",
         }}
       />
 
@@ -60,20 +58,9 @@ export default function Welcome({
             {branchShort}
           </div>
         </div>
-        <div className="flex items-center gap-1">
-          <button
-            aria-label={`Switch to ${
-              theme === "dark" ? "light" : "dark"
-            } theme`}
-            className="w-10 h-10 flex items-center justify-center text-white/70 tap-target rounded-full bg-black/25 backdrop-blur-sm"
-            onClick={onThemeToggle}
-          >
-            {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
-        </div>
       </div>
 
-      <div className="relative z-10 mt-auto px-6 pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] flex flex-col gap-5 text-white">
+      <div className="relative z-10 mt-auto px-6 pt-6 pb-[max(1.5rem,var(--sab))] flex flex-col gap-5 text-white">
         <div>
           <div className="text-[10px] tracking-[0.4em] uppercase text-white/45 mb-2">
             {role === "manager"
@@ -142,6 +129,23 @@ export default function Welcome({
               </button>
             </div>
             <div className="flex flex-col gap-2">
+              <button
+                className="w-full flex items-center justify-between p-4 bg-[var(--text)] text-[var(--bg)] text-left card-press"
+                onClick={() => {
+                  setShowSessions(false)
+                  onProductSale()
+                }}
+              >
+                <div>
+                  <div className="font-display font-700 tracking-wider uppercase">
+                    Sell products only
+                  </div>
+                  <div className="text-[10px] opacity-60 mt-1">
+                    No services — just bill and sell products.
+                  </div>
+                </div>
+                <ShoppingBag size={18} />
+              </button>
               {activeSessions.length === 0 && (
                 <EmptyNote>No active sessions to bill right now.</EmptyNote>
               )}

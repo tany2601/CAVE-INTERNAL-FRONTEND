@@ -121,7 +121,12 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
 /* Tablets and desktops (the admin area has its own layout).
    The staff app uses the whole window: backgrounds, divider lines and the bottom nav run edge to
    edge, while the content sits in a centred column so lines of text and cards stay a comfortable width. */
-:root { --col: 880px; }
+:root {
+  --col: 880px;
+  /* Space under content for the home indicator. Installed iOS apps are not given viewport-fit=cover
+     (it shifts the whole page up by the status bar height), so main.tsx supplies the value there. */
+  --sab: env(safe-area-inset-bottom, 0px);
+}
 
 @media (min-width: 700px) {
   /* Slightly larger type and spacing (rem-based) for the bigger screen. */
@@ -179,19 +184,19 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
 ::-webkit-scrollbar { width: 0; height: 0; }
 
 /* Scroll area above the fixed bottom nav: nav height (~3.7rem) + home-indicator inset. */
-.pb-nav { padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px)); }
-.bottom-nav-offset { bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); }
+.pb-nav { padding-bottom: calc(5rem + var(--sab)); }
+.bottom-nav-offset { bottom: calc(5.5rem + var(--sab)); }
 
 :root {
-  /* Space above every page heading: 3rem, or more below a notch / status bar in the installed app. */
-  --page-top: max(3rem, calc(env(safe-area-inset-top, 0px) + 1rem));
+  /* Space above every page heading. The installed app already starts below the status bar, so this is small. */
+  --page-top: max(1.25rem, calc(env(safe-area-inset-top, 0px) + 0.75rem));
 }
 .pt-page { padding-top: var(--page-top); }
 /* Same, but eases on very short screens so content still fits. */
-.pt-page-fluid { padding-top: max(clamp(1rem, 5dvh, 3rem), calc(env(safe-area-inset-top, 0px) + 0.75rem)); }
+.pt-page-fluid { padding-top: max(clamp(0.75rem, 2.5dvh, 1.5rem), calc(env(safe-area-inset-top, 0px) + 0.75rem)); }
 
 /* Safe area */
-.safe-bottom { padding-bottom: max(0.75rem, env(safe-area-inset-bottom)); }
+.safe-bottom { padding-bottom: max(0.75rem, var(--sab)); }
 .safe-top { padding-top: max(0, env(safe-area-inset-top)); }
 
 /* PIN dot animation */
@@ -235,6 +240,13 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
 }
 
 .animate-sheet-up { animation: sheet-up 0.3s cubic-bezier(0.32, 0.72, 0, 1); }
+
+/* Text-only buttons (Back, Forgot PIN, All stylists…) get a full-size touch area without changing their look. */
+.touch-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+}
 
 /* Tap feedback */
 .tap-target {
@@ -293,11 +305,12 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
   bottom: 0;
   left: 0;
   right: 0;
-  background: var(--surface-soft);
+  /* Same colour as the page, so any strip iOS leaves below the app reads as part of it. */
+  background: var(--bg);
   border-top: 1px solid var(--border-subtle);
   display: flex;
   align-items: stretch;
-  padding-bottom: env(safe-area-inset-bottom, 0);
+  padding-bottom: var(--sab);
   z-index: 50;
 }
 
@@ -1284,7 +1297,9 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
 }
 
 .settings-branch-pins,
-.settings-staff {
+.settings-staff,
+.settings-whatsapp,
+.settings-offers {
   grid-column: span 12;
 }
 
@@ -1807,7 +1822,9 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
   .settings-checklist,
   .settings-manager-pins,
   .settings-branch-pins,
-  .settings-staff {
+  .settings-staff,
+  .settings-whatsapp,
+  .settings-offers {
     grid-column: span 12;
   }
 

@@ -37,6 +37,8 @@ export interface ApiSession {
   discountValue: number
   discountAmount: number
   isEdited?: boolean
+  /** The customer's free-haircut visit (billed), or would be (still open). */
+  isFreeVisit?: boolean
   products: { id: string; productName: string; price: number; paymentMode: ApiPaymentMode }[]
   tipAmount: number
   totalAmount: number
@@ -90,6 +92,15 @@ export interface ApiDay {
   expectedGpay: number | null
   closingCash: number | null
   closingGpay: number | null
+  /** Present on a single day's books (GET /staff/day): what the ledger says moved through the till. */
+  flow?: {
+    salesCash: number
+    salesGpay: number
+    expensesCash: number
+    expensesGpay: number
+    payoutsCash: number
+    payoutsGpay: number
+  }
 }
 
 export interface ApiPayout {
@@ -127,6 +138,8 @@ export interface TodayResponse {
   expenses: ApiExpense[]
   payouts: ApiPayout[]
   day: ApiDay
+  /** How bills reach customers: nothing, sent by the server, or sent by hand from this app. */
+  whatsapp?: { mode: "off" | "api" | "manual"; billFormat: "text" | "image" }
 }
 
 export interface CustomerLookupResponse {
@@ -145,6 +158,8 @@ export interface CloseSessionPayload {
   discountValue?: number
   tipAmount?: number
   paymentMode: ApiPaymentMode
+  /** Customer's WhatsApp number to send the bill to when none was saved at check-in. */
+  whatsappTo?: string
 }
 
 // ── Admin API ────────────────────────────────────────────────────────

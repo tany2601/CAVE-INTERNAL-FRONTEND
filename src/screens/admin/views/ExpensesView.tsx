@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { round2, sumMoney } from "../../../lib/money"
 import {
   ArrowRight,
   Plus,
@@ -88,11 +89,14 @@ export const ExpensesView = () => {
 
   const ledger: ApiTransaction[] = ledgerState.data?.transactions ?? []
   const moneyIn = ledgerState.data?.revenue.collected ?? 0
-  const total = ledger.reduce((sum, item) => sum + item.amount, 0)
-  const cashOut = ledger
-    .filter((t) => t.paymentMode === "CASH")
-    .reduce((sum, t) => sum + t.amount, 0)
-  const gpayOut = total - cashOut
+  const total = sumMoney(ledger.map((item) => item.amount))
+  const cashOut = sumMoney(ledger.filter((t) => t.paymentMode === "CASH").map((t) => t.amount))
+  const gpayOut = round2(total - cashOut)
+  // Commission and tips handed to staff leave the till as well; they sit outside the expense list.
+  const payouts = round2(
+    (ledgerState.data?.revenue.commissionPaid ?? 0) + (ledgerState.data?.revenue.tipWithdrawals ?? 0),
+  )
+  const moneyOut = round2(total + payouts)
 
   const activeBranches = branches.filter((b) => b.isActive)
   const addBranch = activeBranches.find((b) => b.name === branch) ?? activeBranches[0]
@@ -144,23 +148,26 @@ export const ExpensesView = () => {
           <div>
             <span className="admin-kicker">Money in</span>
             <strong className="text-[#4CAF86]">{formatMoney(moneyIn)}</strong>
-            <small>Session revenue</small>
+            <small>Collected from customers, tips included</small>
           </div>
           <div className="expense-flow-line">
             <ArrowRight size={19} />
           </div>
           <div>
             <span className="admin-kicker">Money out</span>
-            <strong className="text-[#E06060]">{formatMoney(total)}</strong>
-            <small>Expenses + advances</small>
+            <strong className="text-[#E06060]">{formatMoney(moneyOut)}</strong>
+            <small>
+              Expenses + advances {formatMoney(total)}
+              {payouts > 0 ? ` · staff payouts ${formatMoney(payouts)}` : ""}
+            </small>
           </div>
           <div className="expense-flow-line">
             <ArrowRight size={19} />
           </div>
           <div>
             <span className="admin-kicker">Net position</span>
-            <strong>{formatMoney(moneyIn - total)}</strong>
-            <small>Revenue minus expenses</small>
+            <strong>{formatMoney(round2(moneyIn - moneyOut))}</strong>
+            <small>Money in minus money out</small>
           </div>
         </section>
 

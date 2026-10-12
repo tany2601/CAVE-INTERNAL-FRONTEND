@@ -112,7 +112,7 @@ export default function PINEntry({
         {/* Back button */}
         <div className="px-5 pt-page-fluid">
           <button
-            className="text-[10px] tracking-[0.25em] uppercase text-[var(--text-muted)] tap-target"
+            className="text-[10px] tracking-[0.25em] uppercase text-[var(--text-muted)] tap-target touch-link"
             onClick={onBack}
           >
             ← Back
@@ -196,13 +196,13 @@ export default function PINEntry({
           </div>
 
           <div className="text-center mt-6">
-            <button className="text-[10px] tracking-[0.2em] uppercase text-[var(--text-faint)] tap-target">
+            <div className="text-[10px] tracking-[0.2em] uppercase text-[var(--text-faint)]">
               Forgot PIN? Contact manager
-            </button>
+            </div>
             {role === "manager" && onAdminSuccess && (
               <div className="mt-3">
                 <button
-                  className="text-[10px] tracking-[0.2em] uppercase text-[var(--text-faint)] tap-target"
+                  className="text-[10px] tracking-[0.2em] uppercase text-[var(--text-faint)] tap-target touch-link"
                   onClick={toggleAdminMode}
                 >
                   {adminMode ? "Manager login" : "Admin login"}

@@ -2,6 +2,8 @@ import { EmptyNote, Podium, SectionLabel } from "../../components/ui"
 import { PACE_CLASS, PACE_LABEL, paceOf } from "../../lib/pace"
 import { ManagerNav } from "../../components/layout"
 import { formatAmount, formatDuration } from "../../lib/format"
+import { round2, sumMoney } from "../../lib/money"
+import { greeting } from "../../lib/greeting"
 import { useBranchData } from "../../context/BranchDataContext"
 import { Session, Stylist } from "../../types"
 import {
@@ -46,25 +48,43 @@ export default function ManagerHome({
     getStylist,
     branchShort,
   } = useBranchData()
-  const productSales = closedSessions.reduce(
-    (a, s) => a + (s.products ?? []).reduce((b, p) => b + p.price * p.qty, 0),
-    0,
+  // Same definitions as the admin reports:
+  //  · revenue = services + products after discount, tips left out
+  //  · money in = revenue + tips, split by how customers paid
+  //  · net in hand = money in − expenses & advances − commission paid − tips withdrawn
+  const tipOf = (s: Session) => s.tip ?? 0
+  const revenueOf = (s: Session) => (s.total ?? 0) - tipOf(s)
+  const totalRevenue = sumMoney(closedSessions.map(revenueOf))
+  const totalTips = sumMoney(closedSessions.map(tipOf))
+  // A discount is shared between services and products in proportion to their value.
+  const productSales = sumMoney(
+    closedSessions.map((s) => {
+      const gross = (s.products ?? []).reduce((b, p) => b + p.price * p.qty, 0)
+      const subtotal = s.subtotal ?? 0
+      const keep = subtotal > 0 ? 1 - Math.min(1, (s.discountAmount ?? 0) / subtotal) : 1
+      return gross * keep
+    }),
   )
-  const tipWithdrawals = payouts
-    .filter((p) => p.kind === "TIP_WITHDRAWAL")
-    .reduce((a, p) => a + p.amount, 0)
-  const totalRevenue = closedSessions.reduce((a, s) => a + (s.total || 0), 0)
-  const cashRevenue = closedSessions
-    .filter((s) => s.paymentMode === "cash")
-    .reduce((a, s) => a + (s.total || 0), 0)
-  const gpayRevenue = closedSessions
-    .filter((s) => s.paymentMode === "gpay")
-    .reduce((a, s) => a + (s.total || 0), 0)
-  const totalCommission = stylists.reduce((a, s) => a + s.commission, 0)
-  const totalExpenses = expenses.reduce((a, e) => a + e.amount, 0)
+  const customers =
+    closedSessions.filter((s) => s.services.length > 0).length + activeSessions.length
+  const cashRevenue = sumMoney(
+    closedSessions.filter((s) => s.paymentMode === "cash").map((s) => s.total ?? 0),
+  )
+  const gpayRevenue = sumMoney(
+    closedSessions.filter((s) => s.paymentMode === "gpay").map((s) => s.total ?? 0),
+  )
+  const tipWithdrawals = sumMoney(
+    payouts.filter((p) => p.kind === "TIP_WITHDRAWAL").map((p) => p.amount),
+  )
+  const commissionPaid = sumMoney(
+    payouts.filter((p) => p.kind === "COMMISSION").map((p) => p.amount),
+  )
+  const totalCommission = sumMoney(stylists.map((s) => s.commission))
+  const totalExpenses = sumMoney(expenses.map((e) => e.amount))
+  const netInHand = round2(
+    totalRevenue + totalTips - totalExpenses - commissionPaid - tipWithdrawals,
+  )
   const now = new Date()
-  const hour = now.getHours()
-  const greeting = hour < 12 ? "Morning" : hour < 17 ? "Afternoon" : "Evening"
 
   return (
     <div className="flex flex-col h-full bg-[var(--bg)]">
@@ -74,7 +94,7 @@ export default function ManagerHome({
           <div className="flex items-start justify-between">
             <div>
               <div className="text-[10px] tracking-[0.25em] uppercase text-[var(--text-subtle)]">
-                {greeting} · Manager
+                {greeting(now)} · Manager
               </div>
               <div className="font-display font-800 leading-none text-[var(--text)] mt-1 text-3xl tracking-wide">
                 CAVE {branchShort.toUpperCase()}
@@ -145,27 +165,19 @@ export default function ManagerHome({
               value={formatAmount(totalRevenue)}
               large
             />
-            <RevenueCard
-              label="Customers"
-              value={String(closedSessions.length + activeSessions.length)}
-              large
-            />
+            <RevenueCard label="Customers" value={String(customers)} large />
           </div>
           <div className="grid grid-cols-2 gap-2 mb-2">
             <RevenueCard label="Product sales" value={formatAmount(productSales)} />
             <RevenueCard label="Tip withdrawals" value={formatAmount(tipWithdrawals)} />
           </div>
-          <div className="grid grid-cols-4 gap-2">
-            <SmallStat label="Cash" value={formatAmount(cashRevenue)} />
-            <SmallStat label="GPay" value={formatAmount(gpayRevenue)} />
-            <SmallStat
-              label="Commission"
-              value={formatAmount(totalCommission)}
-            />
-            <SmallStat
-              label="Net"
-              value={formatAmount(totalRevenue - totalCommission - totalExpenses)}
-            />
+          <div className="grid grid-cols-3 gap-2">
+            <SmallStat label="Cash in" value={formatAmount(cashRevenue)} />
+            <SmallStat label="GPay in" value={formatAmount(gpayRevenue)} />
+            <SmallStat label="Tips" value={formatAmount(totalTips)} />
+            <SmallStat label="Commission" value={formatAmount(totalCommission)} />
+            <SmallStat label="Expenses" value={formatAmount(totalExpenses)} />
+            <SmallStat label="Net in hand" value={formatAmount(netInHand)} />
           </div>
         </div>
 

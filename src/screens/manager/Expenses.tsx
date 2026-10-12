@@ -1,4 +1,5 @@
 import { EmptyNote } from "../../components/ui"
+import { sumMoney } from "../../lib/money"
 import { useState } from "react"
 import { Button, SectionLabel } from "../../components/ui"
 import { formatAmount, formatTime } from "../../lib/format"
@@ -18,12 +19,12 @@ export default function Expenses({ onNav, navTab }: Props) {
   const { expenses, stylists, refresh } = useBranchData()
   const [showAdd, setShowAdd] = useState(false)
 
-  const cashOut = expenses
+  const cashOut = sumMoney(expenses
     .filter((e) => e.paymentMode === "cash")
-    .reduce((a, e) => a + e.amount, 0)
-  const gpayOut = expenses
+    .map((e) => e.amount))
+  const gpayOut = sumMoney(expenses
     .filter((e) => e.paymentMode === "gpay")
-    .reduce((a, e) => a + e.amount, 0)
+    .map((e) => e.amount))
 
   return (
     <div className="flex flex-col h-full bg-[var(--bg)]">

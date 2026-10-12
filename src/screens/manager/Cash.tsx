@@ -1,9 +1,14 @@
-import { useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Button, SectionLabel, AmountRow, Badge } from "../../components/ui"
 import { formatAmount } from "../../lib/format"
 import { useBranchData } from "../../context/BranchDataContext"
 import { staffApi } from "../../lib/api"
 import { AlertCircle, X } from "lucide-react"
+import { round2 } from "../../lib/money"
+import { addDays, dayKeyOf, longDate } from "../../lib/greeting"
+import MorningOpening from "./MorningOpening"
+import EveningClosing from "./EveningClosing"
+import type { ApiDay } from "../../types/api"
 import { ManagerNav } from "../../components/layout"
 
 interface Props {
@@ -38,8 +43,8 @@ export default function Cash({
   const gpayPayouts = payouts
     .filter((p) => p.paymentMode === "GPAY")
     .reduce((a, p) => a + p.amount, 0)
-  const expectedCash = openingCash + cashRevenue - cashExpenses - cashPayouts
-  const expectedGpay = openingGpay + gpayRevenue - gpayExpenses - gpayPayouts
+  const expectedCash = round2(openingCash + cashRevenue - cashExpenses - cashPayouts)
+  const expectedGpay = round2(openingGpay + gpayRevenue - gpayExpenses - gpayPayouts)
   const [showClosing, setShowClosing] = useState(false)
   const [actualCash, setActualCash] = useState("")
   const [actualGpay, setActualGpay] = useState("")
@@ -99,12 +104,12 @@ export default function Cash({
                     </span>
                     <span
                       className={`inline-flex items-center justify-center min-w-[4.75rem] shrink-0 whitespace-nowrap text-[9px] tracking-widest uppercase px-2 py-1 rounded-full border ${
-                        openingCash > 0
+                        day?.openingSet
                           ? "text-[#4CAF86] border-[rgba(46,125,88,0.25)] bg-[rgba(46,125,88,0.08)]"
                           : "text-[var(--text-secondary)] border-[rgba(128,128,128,0.25)] bg-[rgba(128,128,128,0.08)]"
                       }`}
                     >
-                      {openingCash > 0 ? "Entered" : "Pending"}
+                      {day?.openingSet ? "Entered" : "Pending"}
                     </span>
                   </div>
                   <div className="px-4 py-3">
@@ -216,6 +221,8 @@ export default function Cash({
               </div>
             </>
           )}
+
+          <OtherDayBooks />
         </div>
       </div>
 
@@ -337,7 +344,7 @@ function DiffRow({
   expected: number
   actual: number
 }) {
-  const diff = actual - expected
+  const diff = round2(actual - expected)
   const color = diff === 0 ? "#4CAF86" : diff < 0 ? "#E06060" : "#4CAF86"
   return (
     <div className="flex items-center justify-between">
@@ -361,7 +368,7 @@ function CompareRow({
   expected: number
   actual: number
 }) {
-  const diff = actual - expected
+  const diff = round2(actual - expected)
   return (
     <div className="bg-[var(--surface-soft)] border border-[var(--border-subtle)] rounded-sm p-3 flex flex-col gap-2">
       <div className="text-[9px] tracking-widest uppercase text-[var(--text-subtle)]">
@@ -389,6 +396,161 @@ function CompareRow({
           {diff >= 0 ? "+" : ""}
           {formatAmount(diff)} difference
         </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Opening / closing balances for any day in the last 60 days, for entries that were skipped or
+ * forgotten on the day itself.
+ */
+function OtherDayBooks() {
+  const { refresh } = useBranchData()
+  const today = dayKeyOf()
+  const [date, setDate] = useState(addDays(today, -1))
+  const [day, setDay] = useState<ApiDay | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [overlay, setOverlay] = useState<"opening" | "closing" | null>(null)
+  const valid = date >= addDays(today, -60) && date <= today
+
+  const load = useCallback(async () => {
+    if (!valid) return
+    try {
+      setDay(await staffApi.getDay(date))
+      setError(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load that day.")
+    }
+  }, [date, valid])
+
+  useEffect(() => {
+    setDay(null)
+    setError(null)
+    void load()
+  }, [load])
+
+  const forDate = date === today ? undefined : date
+  const done = async () => {
+    setOverlay(null)
+    await Promise.all([load(), refresh()])
+  }
+
+  return (
+    <div>
+      <SectionLabel>Another day's books</SectionLabel>
+      <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-sm p-4 flex flex-col gap-4">
+        <p className="text-[11px] leading-relaxed text-[var(--text-muted)]">
+          Forgot to add a balance? Pick the day and record its opening or closing now.
+        </p>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[9px] tracking-widest uppercase text-[var(--text-subtle)]">Day</span>
+          <input
+            type="date"
+            value={date}
+            min={addDays(today, -60)}
+            max={today}
+            onChange={(e) => e.target.value && setDate(e.target.value)}
+            className="h-12 w-full min-w-0 rounded-sm border border-[var(--border)] bg-[var(--surface-soft)] px-4 text-[var(--text)] outline-none focus:border-[#3D6FA8]"
+          />
+        </label>
+
+        {!valid && <div className="text-xs text-[#E06060]">Choose a day within the last 60 days.</div>}
+        {error && <div className="text-xs text-[#E06060]">{error}</div>}
+        {valid && !error && !day && <div className="text-xs text-[var(--text-muted)]">Loading…</div>}
+
+        {valid && day && (
+          <div className="flex flex-col gap-3 animate-fade-in">
+            <div className="text-[10px] tracking-[0.2em] uppercase text-[var(--text-muted)]">{longDate(date)}</div>
+            <BookRow
+              label="Opening"
+              state={day.openingSet ? "Entered" : "Not recorded"}
+              good={day.openingSet}
+              detail={day.openingSet ? `Cash ${formatAmount(day.openingCash)} · GPay ${formatAmount(day.openingGpay)}` : "No opening balance for this day."}
+              action={day.closed ? undefined : day.openingSet ? "Edit" : "Add"}
+              onAction={() => setOverlay("opening")}
+            />
+            <BookRow
+              label="Closing"
+              state={day.closed ? "Closed" : "Not closed"}
+              good={day.closed}
+              detail={
+                day.closed
+                  ? `Counted cash ${formatAmount(day.closingCash ?? 0)} · GPay ${formatAmount(day.closingGpay ?? 0)}`
+                  : `Expected cash ${formatAmount(day.expectedCash ?? 0)} · GPay ${formatAmount(day.expectedGpay ?? 0)}`
+              }
+              action={day.closed ? undefined : "Close day"}
+              onAction={() => setOverlay("closing")}
+            />
+          </div>
+        )}
+      </div>
+
+      {overlay === "opening" && day && (
+        <MorningOpening
+          date={date}
+          initialCash={day.openingSet ? day.openingCash : undefined}
+          initialGpay={day.openingSet ? day.openingGpay : undefined}
+          onSkip={() => setOverlay(null)}
+          onSave={async (cash, gpay) => {
+            await staffApi.setOpeningBalance(cash, gpay, forDate)
+            await done()
+          }}
+        />
+      )}
+      {overlay === "closing" && (
+        <EveningClosing
+          date={date}
+          onSkip={() => setOverlay(null)}
+          onSave={async (cash, gpay) => {
+            await staffApi.closeDay(cash, gpay, forDate)
+            await done()
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+function BookRow({
+  label,
+  state,
+  good,
+  detail,
+  action,
+  onAction,
+}: {
+  label: string
+  state: string
+  good: boolean
+  detail: string
+  action?: string
+  onAction: () => void
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-sm border border-[var(--border-subtle)] bg-[var(--surface-soft)] p-3">
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-display font-700 tracking-wider uppercase text-sm text-[var(--text)]">{label}</span>
+          <span
+            className={`inline-flex min-w-[4.75rem] shrink-0 items-center justify-center whitespace-nowrap rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-widest ${
+              good
+                ? "border-[rgba(46,125,88,0.25)] bg-[rgba(46,125,88,0.08)] text-[#4CAF86]"
+                : "border-[rgba(128,128,128,0.25)] bg-[rgba(128,128,128,0.08)] text-[var(--text-secondary)]"
+            }`}
+          >
+            {state}
+          </span>
+        </div>
+        <div className="mt-1 text-[10px] leading-snug text-[var(--text-muted)]">{detail}</div>
+      </div>
+      {action && (
+        <button
+          className="h-10 min-w-[5.5rem] shrink-0 whitespace-nowrap rounded-sm border border-[var(--border)] px-3 font-display text-xs font-700 uppercase tracking-wider text-[var(--text)] active:bg-[var(--text)] active:text-[var(--bg)]"
+          onClick={onAction}
+        >
+          {action}
+        </button>
       )}
     </div>
   )

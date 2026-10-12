@@ -45,6 +45,8 @@ export interface Stylist {
   gpayTips?: number;
   /** Tips already handed over, and what is still available to withdraw. */
   tipsWithdrawn?: number;
+  /** Commission already handed over today (more can accrue afterwards). */
+  commissionPaidAmount?: number;
   tipsAvailable?: number;
   /** Time spent with customers in the period, and the average per finished session (minutes). */
   workMinutes?: number;
@@ -66,6 +68,9 @@ export interface Session {
   services: Service[];
   status: 'active' | 'closed';
   total?: number;
+  /** Services + products before discount and tip (billed sessions only). */
+  subtotal?: number;
+  discountAmount?: number;
   paymentMode?: 'cash' | 'gpay';
   tip?: number;
   tipMode?: 'cash' | 'gpay';
@@ -74,6 +79,8 @@ export interface Session {
   discountType?: 'percent' | 'amount';
   discountValue?: number;
   isEdited?: boolean;
+  /** This is the customer's free-haircut visit (every 6th): their haircut bills at ₹0. */
+  freeVisit?: boolean;
 }
 
 export interface Customer {

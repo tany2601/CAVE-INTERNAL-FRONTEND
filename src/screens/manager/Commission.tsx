@@ -2,12 +2,16 @@ import { EmptyNote } from "../../components/ui"
 import { useState } from "react"
 import { Badge, SectionLabel, Button } from "../../components/ui"
 import { formatAmount } from "../../lib/format"
+import { round2, sumMoney } from "../../lib/money"
 import { useBranchData } from "../../context/BranchDataContext"
 import { staffApi } from "../../lib/api"
 import { toApiMode } from "../../lib/mappers"
 import { Stylist } from "../../types"
 import { X } from "lucide-react"
 import { ManagerNav } from "../../components/layout"
+
+/** Commission earned today that has not been handed over yet. */
+const owedOf = (s: Stylist) => round2(Math.max(0, s.commission - (s.commissionPaidAmount ?? 0)))
 
 interface Props {
   onNav: (screen: string) => void
@@ -20,7 +24,7 @@ export default function Commission({ onNav, navTab }: Props) {
   /** What the open sheet settles: the day's commission, or tips handed over to the stylist. */
   const [payKind, setPayKind] = useState<"COMMISSION" | "TIP_WITHDRAWAL">("COMMISSION")
   const isTips = payKind === "TIP_WITHDRAWAL"
-  const payAmount = paying ? (isTips ? (paying.tipsAvailable ?? 0) : paying.commission) : 0
+  const payAmount = paying ? (isTips ? (paying.tipsAvailable ?? 0) : owedOf(paying)) : 0
   const openSheet = (stylist: Stylist, kind: "COMMISSION" | "TIP_WITHDRAWAL") => {
     setPayError(null)
     setPayKind(kind)
@@ -50,12 +54,9 @@ export default function Commission({ onNav, navTab }: Props) {
     }
   }
 
-  const totalPending = stylists
-    .filter((s) => !s.commissionPaid)
-    .reduce((a, s) => a + s.commission, 0)
-  const totalPaid = stylists
-    .filter((s) => s.commissionPaid)
-    .reduce((a, s) => a + s.commission, 0)
+  // Commission keeps accruing after a payout, so "pending" is earned minus already paid, per stylist.
+  const totalPending = sumMoney(stylists.map(owedOf))
+  const totalPaid = sumMoney(stylists.map((s) => s.commissionPaidAmount ?? 0))
 
   return (
     <div className="flex flex-col h-full bg-[var(--bg)]">
@@ -142,12 +143,12 @@ export default function Commission({ onNav, navTab }: Props) {
               </div>
 
               {/* CTA */}
-              {!s.commissionPaid ? (
+              {owedOf(s) > 0 ? (
                 <button
                   className="w-full border-t border-[var(--border-subtle)] py-3 font-display font-700 tracking-[0.2em] uppercase text-xs text-[var(--text)] tap-target active:bg-[var(--text)] active:text-[var(--bg)] transition-all"
                   onClick={() => openSheet(s, "COMMISSION")}
                 >
-                  Mark Paid · {formatAmount(s.commission)}
+                  {(s.commissionPaidAmount ?? 0) > 0 ? "Pay remaining" : "Mark Paid"} · {formatAmount(owedOf(s))}
                 </button>
               ) : (
                 <div className="border-t border-[var(--border-subtle)] py-3 text-center text-[9px] text-[#4CAF86] tracking-widest uppercase">
