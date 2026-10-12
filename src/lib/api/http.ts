@@ -91,16 +91,27 @@ export async function request<T>(
   return payload as T
 }
 
-/** GET a binary file (e.g. the bill picture) with the sign-in token. */
-export async function requestBlob(path: string): Promise<Blob> {
+/** Fetch a binary file (a picture, an Excel sheet, spoken audio) with the sign-in token. */
+export async function requestBlob(
+  path: string,
+  init: { method?: "GET" | "POST"; body?: unknown } = {},
+): Promise<Blob> {
   let res: Response
   try {
     res = await fetch(`${API_BASE_URL}${path}`, {
-      headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+      method: init.method ?? "GET",
+      headers: {
+        ...(init.body !== undefined ? { "Content-Type": "application/json" } : {}),
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+      },
+      body: init.body === undefined ? undefined : JSON.stringify(init.body),
     })
   } catch {
     throw new ApiError(0, friendlyMessage(0))
   }
-  if (!res.ok) throw new ApiError(res.status, friendlyMessage(res.status))
+  if (!res.ok) {
+    if (res.status === 401 && unauthorizedHandler) unauthorizedHandler()
+    throw new ApiError(res.status, friendlyMessage(res.status))
+  }
   return res.blob()
 }

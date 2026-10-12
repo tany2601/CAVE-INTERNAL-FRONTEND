@@ -31,6 +31,7 @@ import { useAsyncData } from "../../hooks/useAsyncData"
 import type { AdminSection } from "./adminTypes"
 import { useAdminActions } from "./hooks/useAdminActions"
 import type { BranchTab, Period } from "./types"
+import { AssistantDock } from "./assistant/AssistantDock"
 import {
   Overview,
   BranchDetail,
@@ -342,6 +343,7 @@ export default function AdminDashboard({ onLogout, theme, onThemeToggle }: Props
         )}
       </main>
       {adminActions.feedback}
+      <AssistantDock />
     </div>
   )
 }

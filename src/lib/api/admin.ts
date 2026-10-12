@@ -400,3 +400,41 @@ export const updateProduct = (id: string, body: Partial<ProductInput>) =>
 
 export const deleteProduct = (id: string) =>
   request<unknown>("DELETE", `/admin/products/${id}`)
+
+
+// ── Baron, the admin's business assistant ─────────────────────────────────────
+
+export interface AssistantContext {
+  /** "all" for the whole business, or a branch id. */
+  branch?: string
+  period?: { from: string; to: string; name: string | null }
+  awaiting?: "branch" | "period" | "dates"
+  intent?: "report" | "insights" | "download"
+}
+
+export interface AssistantReply {
+  text: string
+  speech: string
+  card?: {
+    title: string
+    stats: { label: string; value: string }[]
+    insights: { tone: "good" | "warn" | "info"; text: string }[]
+  }
+  chips: string[]
+  action?: { type: "download"; label: string; from: string; to: string; branchId: string | null }
+  context: AssistantContext
+}
+
+export const assistantStatus = () => request<{ name: string; neuralVoice: boolean }>("GET", "/admin/assistant/status")
+
+export const assistantChat = (message: string, context?: AssistantContext) =>
+  request<AssistantReply>("POST", "/admin/assistant/chat", { body: { message, context } })
+
+/** The answer as natural speech (MP3). Fails when no neural voice is set up; the app then uses the browser's voice. */
+export const assistantSpeak = (text: string) => requestBlob("/admin/assistant/speak", { method: "POST", body: { text } })
+
+/** The Excel report for one branch (or all, with no branchId) over any dates. */
+export const downloadAssistantReport = (from: string, to: string, branchId: string | null) =>
+  requestBlob(
+    `/admin/assistant/report?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${branchId ? `&branchId=${encodeURIComponent(branchId)}` : ""}`,
+  )

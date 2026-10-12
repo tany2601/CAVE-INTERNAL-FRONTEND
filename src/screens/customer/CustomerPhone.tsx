@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useKeyboardStable } from "../../hooks/useKeyboardStable"
 import { Button, PhoneInput, ScreenBackdrop, BACKDROPS } from "../../components/ui"
 import { isValidPhone, phoneError } from "../../lib/phone"
 import { MessageCircle } from "lucide-react"
@@ -14,6 +15,7 @@ export default function CustomerPhone({
   onContinue,
   onBack,
 }: Props) {
+  useKeyboardStable()
   const [phone, setPhone] = useState("")
   const [skipWarn, setSkipWarn] = useState(false)
 
@@ -34,9 +36,10 @@ export default function CustomerPhone({
           <div className="flex-1 h-px bg-[var(--text)]" />
           <div className="flex-1 h-px bg-[var(--text)]" />
           <div className="flex-1 h-px bg-[var(--border-subtle)]" />
-          <div className="flex-1 h-px bg-[var(--border-subtle)]" />
+          {/* With the "what are you here for?" step back on: add a 4th segment and show "02 / 04".
+          <div className="flex-1 h-px bg-[var(--border-subtle)]" /> */}
           <span className="text-[10px] tracking-[0.2em] text-[var(--text-muted)] ml-2">
-            02 / 04
+            02 / 03
           </span>
         </div>
       </div>
@@ -56,12 +59,6 @@ export default function CustomerPhone({
             </p>
           </div>
 
-          {/* WhatsApp indicator */}
-          <div className="flex items-center gap-2 text-[#2E7D58]">
-            <MessageCircle size={14} strokeWidth={1.5} />
-            <span className="text-[11px] tracking-wide">Sent via WhatsApp</span>
-          </div>
-
           {/* Phone input */}
           <div className="flex flex-col gap-2">
             <div className="flex items-end gap-3 border-b-2 border-[var(--border-subtle)] focus-within:border-[var(--text)] transition-colors pb-2">
@@ -73,7 +70,8 @@ export default function CustomerPhone({
                 placeholder="00000 00000"
                 value={phone}
                 onChange={setPhone}
-                autoFocus
+                // autoFocus removed: the keyboard opens only when the customer taps the field.
+                // autoFocus
                 showError={false}
               />
             </div>
@@ -84,6 +82,12 @@ export default function CustomerPhone({
             >
               {phoneError(phone) ?? `${phone.length}/10 digits`}
             </div>
+          </div>
+
+          {/* WhatsApp indicator (below the field so the field sits higher, clear of the keyboard) */}
+          <div className="flex items-center gap-2 text-[#2E7D58]">
+            <MessageCircle size={14} strokeWidth={1.5} />
+            <span className="text-[11px] tracking-wide">Sent via WhatsApp</span>
           </div>
 
           {/* Skip warning */}

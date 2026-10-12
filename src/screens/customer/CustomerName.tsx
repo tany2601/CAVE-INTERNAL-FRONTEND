@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useKeyboardStable } from "../../hooks/useKeyboardStable"
 import { Button, ScreenBackdrop, BACKDROPS } from "../../components/ui"
 import { isValidPersonName, sanitizePersonName } from "../../lib/names"
 
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export default function CustomerName({ onContinue, onBack }: Props) {
+  useKeyboardStable()
   const [name, setName] = useState("")
   const [showError, setShowError] = useState(false)
   const tooShort = !isValidPersonName(name, MIN_NAME_LENGTH)
@@ -31,9 +33,10 @@ export default function CustomerName({ onContinue, onBack }: Props) {
           <div className="flex-1 h-px bg-[var(--text)]" />
           <div className="flex-1 h-px bg-[var(--border-subtle)]" />
           <div className="flex-1 h-px bg-[var(--border-subtle)]" />
-          <div className="flex-1 h-px bg-[var(--border-subtle)]" />
+          {/* With the "what are you here for?" step back on: add a 4th segment and show "01 / 04".
+          <div className="flex-1 h-px bg-[var(--border-subtle)]" /> */}
           <span className="text-[10px] tracking-[0.2em] text-[var(--text-muted)] ml-2">
-            01 / 04
+            01 / 03
           </span>
         </div>
       </div>
@@ -64,7 +67,9 @@ export default function CustomerName({ onContinue, onBack }: Props) {
               }}
               onKeyDown={(e) => e.key === "Enter" && submit()}
               aria-invalid={showError}
-              autoFocus
+              // autoFocus removed: the keyboard opens only when the customer taps the field.
+              // autoFocus
+              enterKeyHint="go"
               autoComplete="off"
               style={{ caretColor: "var(--text)" }}
             />

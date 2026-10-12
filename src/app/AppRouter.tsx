@@ -18,7 +18,7 @@ import CustomerName from "../screens/customer/CustomerName"
 import CustomerPhone from "../screens/customer/CustomerPhone"
 import Loyalty from "../screens/customer/Loyalty"
 import StylistSelection from "../screens/customer/StylistSelection"
-import ServiceSelection from "../screens/customer/ServiceSelection"
+// import ServiceSelection from "../screens/customer/ServiceSelection" // restore with the "what are you here for?" step
 
 // Stylist
 import StylistHome from "../screens/stylist/StylistHome"
@@ -473,13 +473,20 @@ function AppScreens({ onScreen }: { onScreen: (screen: string) => void }) {
           setCustomerPhone(phone)
           setStartError(null)
           setCurrentCustomer(await lookupLoyalty(customerName, phone))
-          nav("customer-services")
+          // The "what are you here for?" step is switched off (felt long for customers).
+          // To bring it back: use nav("customer-services") here, restore the block below,
+          // and see the steps notes in CustomerName.tsx / CustomerPhone.tsx.
+          nav("loyalty")
+          // nav("customer-services")
         }}
         onBack={() => nav("customer-name")}
       />
     )
   }
 
+  // "What are you here for?" step (switched off). Restore this block, and point the phone step
+  // above at nav("customer-services"), to bring it back:
+  /*
   if (screen === "customer-services") {
     return (
       <ServiceSelection
@@ -494,6 +501,7 @@ function AppScreens({ onScreen }: { onScreen: (screen: string) => void }) {
       />
     )
   }
+  */
 
   if (screen === "loyalty" && currentCustomer) {
     return (
