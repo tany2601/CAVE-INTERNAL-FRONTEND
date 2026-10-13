@@ -208,6 +208,16 @@ function AppScreens({ onScreen }: { onScreen: (screen: string) => void }) {
     localStorage.setItem("cave-theme", theme)
   }, [theme])
 
+  // The dashboard look (version 2) is for the dashboards only; sign-in and customer check-in keep the original.
+  // Switch it off for everyone with <meta name="cave-dashboard-ui" content="classic"> in index.html.
+  const dashboardUi =
+    !ALWAYS_DARK.includes(screen) &&
+    document.querySelector('meta[name="cave-dashboard-ui"]')?.getAttribute("content") === "v2"
+  useEffect(() => {
+    if (dashboardUi) document.documentElement.dataset.ui = "v2"
+    else delete document.documentElement.dataset.ui
+  }, [dashboardUi])
+
   // The admin area uses the full screen; every other screen sits in the phone-width frame.
   useEffect(() => {
     document.body.dataset.shell = screen === "admin-dashboard" ? "admin" : "app"

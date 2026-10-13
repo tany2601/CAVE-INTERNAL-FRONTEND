@@ -1,0 +1,89 @@
+/*
+ * Dashboard look, version 2: readable text (same colours, lighter greys) and larger small print.
+ *
+ * Only the dashboards get it (stylist, manager, admin, billing). Sign-in and the customer check-in keep the
+ * original look because this is scoped to <html data-ui="v2">, which the app sets only on dashboard screens.
+ *
+ * To go back to the original look: in index.html change
+ *     <meta name="cave-dashboard-ui" content="v2" />
+ * to  content="classic".   Nothing else needs to change (index.css is untouched; a copy of it is in
+ * docs/ui-backup/index.classic.css).
+ */
+
+/* ── Text colours only: the same neutral greys, just light enough to read (all at least 4.8:1) ────────────
+   Backgrounds, cards, borders, the green/red amounts and the white active tab keep their original colours. */
+html[data-ui='v2'] {
+  --text-secondary: #d2d2d2; /* was #9a9a9a */
+  --text-muted: #ababab; /* was #555555 (about 2.7:1) → about 8.7:1 */
+  --text-subtle: #969696; /* was #444444 */
+  --text-faint: #808080; /* was #333333 */
+}
+
+html[data-ui='v2'][data-theme='light'] {
+  --text-secondary: #2a2a2a;
+  --text-muted: #4a4a4a; /* was #666666 */
+  --text-subtle: #5c5c5c; /* was #777777 */
+  --text-faint: #6b6b6b; /* was #999999 */
+}
+
+/* ── Type: no more 8 to 11 pixel text, and less letter-spacing so capitals stay readable ───────────────── */
+html[data-ui='v2'] .text-\[8px\],
+html[data-ui='v2'] .text-\[9px\] { font-size: 11px; }
+html[data-ui='v2'] .text-\[10px\] { font-size: 12px; }
+html[data-ui='v2'] .text-\[11px\] { font-size: 12.5px; }
+html[data-ui='v2'] .text-\[0\.65rem\] { font-size: 0.76rem; }
+html[data-ui='v2'] .text-xs { font-size: 0.8125rem; line-height: 1.2rem; }
+html[data-ui='v2'] .tracking-\[0\.2em\],
+html[data-ui='v2'] .tracking-\[0\.25em\],
+html[data-ui='v2'] .tracking-\[0\.3em\],
+html[data-ui='v2'] .tracking-\[0\.35em\],
+html[data-ui='v2'] .tracking-\[0\.4em\] { letter-spacing: 0.12em; }
+html[data-ui='v2'] .tracking-\[0\.15em\],
+html[data-ui='v2'] .tracking-\[0\.14em\] { letter-spacing: 0.09em; }
+/* Small capital labels get a little more weight so they read clearly. */
+html[data-ui='v2'] .uppercase.text-\[9px\],
+html[data-ui='v2'] .uppercase.text-\[10px\],
+html[data-ui='v2'] .uppercase.text-\[11px\] { font-weight: 600; }
+
+/* Small text set in the shared stylesheet (cards, tables, admin pages) */
+/* 11px with tighter spacing keeps the 6 manager tabs (Today… Menu) from touching on a phone. */
+html[data-ui='v2'] .nav-item { font-size: 11px; font-weight: 600; letter-spacing: 0.02em; padding-left: 1px; padding-right: 1px; }
+html[data-ui='v2'] .admin-kicker { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.1em; }
+html[data-ui='v2'] .admin-segment button { font-size: 0.78rem; }
+html[data-ui='v2'] .admin-table th { font-size: 0.72rem; letter-spacing: 0.08em; }
+html[data-ui='v2'] .admin-table td { font-size: 0.82rem; }
+html[data-ui='v2'] .admin-view-more,
+html[data-ui='v2'] .admin-secondary-button,
+html[data-ui='v2'] .pricing-branch-switcher button,
+html[data-ui='v2'] .pricing-add-row button { font-size: 0.76rem; }
+html[data-ui='v2'] .admin-danger-button { font-size: 0.74rem; }
+html[data-ui='v2'] .branch-target-dial span,
+html[data-ui='v2'] .retention-ring span,
+html[data-ui='v2'] .employee-performance-block span { font-size: 0.68rem; }
+html[data-ui='v2'] .branch-finance-flow span,
+html[data-ui='v2'] .commission-command-metric span,
+html[data-ui='v2'] .customer-hero-stat small,
+html[data-ui='v2'] .retention-periods small,
+html[data-ui='v2'] .pricing-sync-note { font-size: 0.72rem; }
+html[data-ui='v2'] .expense-balance-strip small { font-size: 0.74rem; }
+html[data-ui='v2'] .expense-date small { font-size: 0.66rem; }
+html[data-ui='v2'] .employee-roster-head { font-size: 0.72rem; }
+html[data-ui='v2'] .retention-branch-pill,
+html[data-ui='v2'] .pricing-index > button,
+html[data-ui='v2'] .pricing-row-number,
+html[data-ui='v2'] .pricing-row label,
+html[data-ui='v2'] .pricing-add-row input { font-size: 0.8rem; }
+
+/* ── Navigation: the current tab gets a small bar in the normal text colour (no new colour) ──────────────── */
+html[data-ui='v2'] .nav-item { color: var(--text-muted); position: relative; }
+html[data-ui='v2'] .nav-item.active { color: var(--text); }
+html[data-ui='v2'] .nav-item.active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 28%;
+  right: 28%;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: var(--text);
+}

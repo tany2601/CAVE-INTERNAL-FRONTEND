@@ -8,4 +8,9 @@ try {
   if (localStorage.getItem("cave-theme") === "light" && signedIn && s !== "welcome") {
     document.documentElement.dataset.theme = "light";
   }
+  // Dashboard look (see <meta name="cave-dashboard-ui"> in index.html), also only for a signed-in dashboard.
+  var ui = document.querySelector('meta[name="cave-dashboard-ui"]');
+  if (ui && ui.content === "v2" && signedIn && s !== "welcome") {
+    document.documentElement.dataset.ui = "v2";
+  }
 } catch (e) {}
