@@ -247,6 +247,17 @@ export function AssistantDock() {
               </button>
             </header>
 
+            {voice.notice && (
+              <div role="status" className="flex shrink-0 items-start gap-2 border-b border-[var(--border-subtle)] bg-[rgba(229,169,61,0.1)] px-4 py-2 text-[11px] leading-snug text-[var(--text-secondary)]">
+                <span className="min-w-0 flex-1">
+                  <strong className="font-600 text-[var(--text)]">Using the device voice.</strong> {voice.notice}
+                </span>
+                <button type="button" aria-label="Dismiss" className="shrink-0 text-[var(--text-muted)]" onClick={voice.clearNotice}>
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+
             <div ref={scroller} className="assistant-scroll min-h-0 flex-1 overflow-y-auto px-3 py-4">
               <div className="flex flex-col gap-3">
                 {messages.map((m) =>

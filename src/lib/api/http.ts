@@ -3,10 +3,13 @@ import { friendlyMessage } from "../errors"
 
 export class ApiError extends Error {
   status: number
-  constructor(status: number, message: string) {
+  /** The server's own explanation, when it gave one (shown only where that helps, e.g. why a voice failed). */
+  detail?: string
+  constructor(status: number, message: string, detail?: string) {
     super(message)
     this.name = "ApiError"
     this.status = status
+    this.detail = detail
   }
 }
 
@@ -111,7 +114,13 @@ export async function requestBlob(
   }
   if (!res.ok) {
     if (res.status === 401 && unauthorizedHandler) unauthorizedHandler()
-    throw new ApiError(res.status, friendlyMessage(res.status))
+    let detail: string | undefined
+    try {
+      detail = extractMessage(await res.json(), "") || undefined
+    } catch {
+      // no readable body
+    }
+    throw new ApiError(res.status, friendlyMessage(res.status), detail)
   }
   return res.blob()
 }

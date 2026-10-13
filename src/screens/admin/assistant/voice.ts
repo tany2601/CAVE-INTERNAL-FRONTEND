@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { adminApi } from "../../../lib/api"
+import { ApiError } from "../../../lib/api/http"
 
 const KEY = "cave.assistant.voice"
 
@@ -50,6 +51,8 @@ export function useVoice(neural: boolean) {
     }
   })
   const [speaking, setSpeaking] = useState(false)
+  /** Why the natural voice isn't being used right now (shown to the admin), or null. */
+  const [notice, setNotice] = useState<string | null>(null)
   const audio = useRef<HTMLAudioElement | null>(null)
   const objectUrl = useRef<string | null>(null)
   const run = useRef(0) // bumped to cancel whatever is being said
@@ -116,15 +119,17 @@ export function useVoice(neural: boolean) {
           objectUrl.current = url
           if (!audio.current) audio.current = new Audio()
           const el = audio.current
+          setNotice(null)
           el.src = url
           el.onended = () => id === run.current && setSpeaking(false)
           el.onerror = () => id === run.current && setSpeaking(false)
           setSpeaking(true)
           await el.play()
           return
-        } catch {
+        } catch (e) {
           if (id !== run.current) return
-          // fall through to the device's voice
+          // The natural voice failed (plan limit, wrong voice id…): say why once, and use the device's voice instead.
+          setNotice(e instanceof ApiError && e.detail ? e.detail : "The natural voice isn't available right now.")
         }
       }
       browserSpeak(text, id)
@@ -155,5 +160,5 @@ export function useVoice(neural: boolean) {
     }
   }, [])
 
-  return { enabled, setEnabled, speaking, speak, stop, unlock }
+  return { enabled, setEnabled, speaking, speak, stop, unlock, notice, clearNotice: () => setNotice(null) }
 }
