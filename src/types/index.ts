@@ -78,6 +78,9 @@ export interface Session {
   products?: { name: string; price: number; qty: number }[];
   discountType?: 'percent' | 'amount';
   discountValue?: number;
+  /** The discount on the services and on the products, kept apart (billed sessions; undefined on older bills). */
+  serviceDiscount?: { mode: 'percent' | 'amount'; value: number; amount: number };
+  productDiscount?: { mode: 'percent' | 'amount'; value: number; amount: number };
   isEdited?: boolean;
   /** This is the customer's free-haircut visit (every 6th): their haircut bills at ₹0. */
   freeVisit?: boolean;

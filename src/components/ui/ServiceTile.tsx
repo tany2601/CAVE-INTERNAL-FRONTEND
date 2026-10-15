@@ -18,12 +18,15 @@ export function ServiceTile({
   index,
   selected,
   onToggle,
+  qty = 0,
 }: {
   name: string
   price: number
   index: number
   selected: boolean
   onToggle: () => void
+  /** How many are on the bill: shown as a "×2" badge instead of the tick when more than one. */
+  qty?: number
 }) {
   // Combo names carry their contents in brackets: "The Basic (Haircut + …)". Show the name big and
   // the contents small so the tile never has to cut text off.
@@ -48,8 +51,8 @@ export function ServiceTile({
       />
       <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-black/10" />
       {selected && (
-        <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-white text-black flex items-center justify-center">
-          <Check size={13} />
+        <div className="absolute top-2 right-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-white px-1.5 text-black">
+          {qty > 1 ? <span className="text-[11px] font-700">×{qty}</span> : <Check size={13} />}
         </div>
       )}
       <div className="relative p-3 pt-10 text-white">

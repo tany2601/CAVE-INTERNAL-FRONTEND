@@ -56,12 +56,21 @@ export default function ManagerHome({
   const revenueOf = (s: Session) => (s.total ?? 0) - tipOf(s)
   const totalRevenue = sumMoney(closedSessions.map(revenueOf))
   const totalTips = sumMoney(closedSessions.map(tipOf))
-  // A discount is shared between services and products in proportion to their value.
+  // When the bill recorded the discount on the products apart from the services, that is used (exact). Older bills
+  // have one whole-bill discount, shared between services and products in proportion to their value.
   const productSales = sumMoney(
     closedSessions.map((s) => {
       const gross = (s.products ?? []).reduce((b, p) => b + p.price * p.qty, 0)
       const subtotal = s.subtotal ?? 0
-      const keep = subtotal > 0 ? 1 - Math.min(1, (s.discountAmount ?? 0) / subtotal) : 1
+      const recorded = (s.serviceDiscount?.amount ?? 0) + (s.productDiscount?.amount ?? 0)
+      const exact = recorded > 0 && Math.abs(recorded - (s.discountAmount ?? 0)) < 0.005
+      const keep = exact
+        ? gross > 0
+          ? 1 - Math.min(1, (s.productDiscount?.amount ?? 0) / gross)
+          : 1
+        : subtotal > 0
+          ? 1 - Math.min(1, (s.discountAmount ?? 0) / subtotal)
+          : 1
       return gross * keep
     }),
   )

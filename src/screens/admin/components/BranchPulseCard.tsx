@@ -5,6 +5,16 @@ import { CompactMetric } from "./CompactMetric"
 
 export type BranchPulse = OverviewReport["branches"][number]
 
+/**
+ * "Karkala, Karnataka": the city and state. The server sends them as `place`; a server that has not been updated
+ * yet only sends the full address (address, city, state), so then the last two parts are used.
+ */
+export const branchPlace = (branch: BranchPulse): string => {
+  if (branch.place !== undefined) return branch.place || branch.location
+  const parts = branch.location.split(",").map((p) => p.trim()).filter(Boolean)
+  return parts.length > 2 ? parts.slice(-2).join(", ") : branch.location
+}
+
 /** One branch's snapshot: revenue, customers, active sessions and progress to its monthly target. */
 export function BranchPulseCard({
   branch,
@@ -24,7 +34,7 @@ export function BranchPulseCard({
             {branch.name}
           </div>
           <div className="text-[10px] tracking-widest uppercase text-[var(--text-muted)] mt-1">
-            {branch.location}
+            {branchPlace(branch)}
           </div>
         </div>
         <div className="w-9 h-9 rounded-full border border-[var(--border)] flex items-center justify-center text-[var(--text-muted)] group-hover:text-[var(--text)]">

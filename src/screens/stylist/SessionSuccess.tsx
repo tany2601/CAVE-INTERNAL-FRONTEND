@@ -6,6 +6,7 @@ import { useBranchData } from "../../context/BranchDataContext"
 import { staffApi } from "../../lib/api"
 import { billNo, billText, whatsappLink } from "../../lib/billText"
 import { isValidPhone, sanitizePhone } from "../../lib/phone"
+import { groupLines, withQty } from "../../lib/billing"
 import { CheckCircle, Download, MessageCircle, Share2 } from "lucide-react"
 
 interface Props {
@@ -40,7 +41,7 @@ export default function SessionSuccess({
         <Row label="Stylist" value={stylist?.name || "—"} />
         <Row
           label="Services"
-          value={session.services?.map((s) => s.name).join(", ") || "—"}
+          value={session.services ? groupLines(session.services).map((l) => withQty(l.name, l.qty)).join(", ") : "—"}
         />
         <div className="border-t border-[var(--border-subtle)] pt-3">
           <Row label="Total" value={formatAmount(total)} bold />

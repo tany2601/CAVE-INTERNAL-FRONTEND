@@ -106,13 +106,13 @@ const buildBillPayload = (
     paymentMode: toApiMode(data.paymentMode),
     ...(data.whatsappTo ? { whatsappTo: data.whatsappTo } : {}),
   }
-  if (data.discountValue > 0) {
-    payload.discountType = data.discountType === "percent" ? "PERCENTAGE" : "FIXED"
-    payload.discountValue =
-      data.discountType === "percent"
-        ? Math.min(data.discountValue, 100)
-        : data.discount
-  }
+  // The discount on the services and on the products, each as a percentage or the rupees taken off.
+  const part = (d: CloseData["serviceDiscount"]) =>
+    d.amount > 0
+      ? { type: d.mode === "percent" ? ("PERCENTAGE" as const) : ("FIXED" as const), value: d.value }
+      : { type: "NONE" as const, value: 0 }
+  payload.serviceDiscount = part(data.serviceDiscount)
+  payload.productDiscount = part(data.productDiscount)
   return payload
 }
 

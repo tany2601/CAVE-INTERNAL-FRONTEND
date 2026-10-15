@@ -1,11 +1,13 @@
 import { useRef, useState } from "react"
 import { Session, Service } from "../../types"
-import { Button, SectionLabel, AmountRow, Select, ServiceTile, PhoneInput } from "../../components/ui"
+import { Button, SectionLabel, AmountRow, Select, ServiceTile, PhoneInput, HScroller } from "../../components/ui"
 import { isValidPhone, sanitizePhone } from "../../lib/phone"
 import { billNo, billText, whatsappLink } from "../../lib/billText"
 import { formatAmount } from "../../lib/format"
 import { round2, sumMoney } from "../../lib/money"
 import { freeHaircutIndex } from "../../lib/loyalty"
+import { discountOn, groupLines, parseValue, withQty, type DiscountMode } from "../../lib/billing"
+import type { BranchDiscountConfig, DiscountSetting } from "../../types/api"
 import { useBranchData } from "../../context/BranchDataContext"
 import { X, Plus, Minus, Check } from "lucide-react"
 
@@ -17,9 +19,11 @@ interface Props {
     tipMode: "cash" | "gpay"
     paymentMode: "cash" | "gpay"
     products: { name: string; qty: number; price: number }[]
+    /** Both discounts added up, in rupees. */
     discount: number
-    discountType: "amount" | "percent"
-    discountValue: number
+    /** The discount on the services and on the products; `amount` is the rupees it takes off. */
+    serviceDiscount: { mode: DiscountMode; value: number; amount: number }
+    productDiscount: { mode: DiscountMode; value: number; amount: number }
     /** 10-digit WhatsApp number typed at billing, when the customer had none saved. */
     whatsappTo?: string
   }) => Promise<{ id: string } | void> | { id: string } | void
@@ -33,6 +37,40 @@ interface Product {
   price: number
   image?: string
   qty: number
+}
+
+/** A discount as typed on the billing screen: percent or rupees, and the number (kept as text while typing). */
+interface DiscountField {
+  mode: DiscountMode
+  value: string
+}
+const noDiscount: DiscountField = { mode: "percent", value: "" }
+const fieldOf = (mode: DiscountMode, value: number): DiscountField => ({ mode, value: value > 0 ? String(value) : "" })
+const fromSetting = (d: DiscountSetting): DiscountField => fieldOf(d.type === "PERCENTAGE" ? "percent" : "amount", d.value)
+
+/**
+ * What the two discount boxes start with: a bill being corrected keeps its own discounts; a new bill starts with
+ * the branch's discount when the admin has switched it on (Admin → Discounts), otherwise with none.
+ */
+function startingDiscounts(session: Session, config: BranchDiscountConfig, editing: boolean): { services: DiscountField; products: DiscountField } {
+  if (editing) {
+    if (session.serviceDiscount || session.productDiscount) {
+      const f = (d: Session["serviceDiscount"]) => (d ? fieldOf(d.mode, d.value) : noDiscount)
+      return { services: f(session.serviceDiscount), products: f(session.productDiscount) }
+    }
+    // A bill from before the two were kept apart: one discount on the whole bill.
+    if (session.discountType === "percent" && session.discountValue) {
+      const f = fieldOf("percent", session.discountValue)
+      return { services: f, products: f }
+    }
+    if (session.discountType === "amount" && session.discountAmount) {
+      const f = fieldOf("amount", session.discountAmount)
+      return session.services.length > 0 ? { services: f, products: noDiscount } : { services: noDiscount, products: f }
+    }
+    return { services: noDiscount, products: noDiscount }
+  }
+  if (config.enabled) return { services: fromSetting(config.services), products: fromSetting(config.products) }
+  return { services: noDiscount, products: noDiscount }
 }
 
 export default function CloseSession({ session, onComplete, onCancel, productOnly = false }: Props) {
@@ -66,12 +104,15 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
   const [products, setProducts] = useState<Product[]>(
     (session.products ?? []).map((p) => ({ ...p })),
   )
-  const [discountValue, setDiscountValue] = useState(session.discountValue ?? 0)
-  const [discountMode, setDiscountMode] = useState<"amount" | "percent">(
-    session.discountType ?? "percent",
-  )
   const stylist = getStylist(session.stylistId)
-  const { whatsapp: waSettings, branchName } = useBranchData()
+  const { whatsapp: waSettings, branchName, discount: branchDiscount } = useBranchData()
+  const [serviceDiscountField, setServiceDiscountField] = useState<DiscountField>(
+    () => startingDiscounts(session, branchDiscount, session.status === "closed").services,
+  )
+  const [productDiscountField, setProductDiscountField] = useState<DiscountField>(
+    () => startingDiscounts(session, branchDiscount, session.status === "closed").products,
+  )
+  const startedWithBranchDiscount = !editing && branchDiscount.enabled
   const waMode = waSettings.mode
   const [whatsapp, setWhatsapp] = useState("")
 
@@ -94,13 +135,15 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
     (service) => service.name.trim().length === 0 || !(service.price > 0),
   )
 
-  const toggleService = (service: Service) => {
-    setSelectedServices((current) =>
-      current.some((item) => item.id === service.id)
-        ? current.filter((item) => item.id !== service.id)
-        : [...current, service],
-    )
-  }
+  // Each service on the bill is one entry, so three haircuts are three entries; the screens show them as
+  // "Haircut ×3". Tapping a service adds one more; the − button takes one away.
+  const addService = (service: Service) => setSelectedServices((current) => [...current, service])
+  const removeServiceUnit = (id: string) =>
+    setSelectedServices((current) => {
+      const at = current.map((item) => item.id).lastIndexOf(id)
+      return at < 0 ? current : current.filter((_, i) => i !== at)
+    })
+  const qtyOf = (id: string) => selectedServices.filter((item) => item.id === id).length
 
   // Same arithmetic as the server (paise-exact), so the bill shown here is the bill that gets saved.
   // Menu items are billed at today's menu price. On the customer's free (6th) visit the cheapest
@@ -120,11 +163,27 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
   const serviceTotal = sumMoney(billServices.map((service) => service.price))
   const productTotal = sumMoney(products.map((product) => product.price * product.qty))
   const subtotal = round2(serviceTotal + productTotal)
-  const discount =
-    discountMode === "percent"
-      ? Math.min(subtotal, round2((subtotal * Math.min(discountValue, 100)) / 100))
-      : Math.min(subtotal, round2(discountValue))
+  const serviceDiscountValue = parseValue(serviceDiscountField.value)
+  const productDiscountValue = parseValue(productDiscountField.value)
+  const serviceDiscountAmount = discountOn(serviceDiscountField.mode, serviceDiscountValue, serviceTotal)
+  const productDiscountAmount = discountOn(productDiscountField.mode, productDiscountValue, productTotal)
+  const discount = round2(serviceDiscountAmount + productDiscountAmount)
   const total = Math.max(0, round2(subtotal - discount + tip))
+  // What is sent for each part: a percentage as typed (at most 100), or the rupees actually taken off.
+  const serviceDiscount = {
+    mode: serviceDiscountField.mode,
+    value: serviceDiscountField.mode === "percent" ? Math.min(serviceDiscountValue, 100) : serviceDiscountAmount,
+    amount: serviceDiscountAmount,
+  }
+  const productDiscount = {
+    mode: productDiscountField.mode,
+    value: productDiscountField.mode === "percent" ? Math.min(productDiscountValue, 100) : productDiscountAmount,
+    amount: productDiscountAmount,
+  }
+  // Summary lines: the same service several times is one line with its quantity.
+  const serviceLines = groupLines(billServices)
+  const productLines = groupLines(products.flatMap((p) => Array.from({ length: p.qty }, () => ({ name: p.name, price: p.price }))))
+  const menuServiceGroups = [...new Set(selectedServices.filter((s) => menuIds.has(s.id)).map((s) => s.id))]
 
   const updateCatalogProduct = (product: Product) => {
     setProducts((current) => {
@@ -187,20 +246,19 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
             <SectionLabel>Most selected</SectionLabel>
             <div className="flex gap-2 overflow-x-auto pb-1">
               {SERVICES.slice(0, 3).map((service) => {
-                const selected = selectedServices.some(
-                  (item) => item.id === service.id,
-                )
+                const qty = qtyOf(service.id)
                 return (
                   <button
                     key={service.id}
                     className={`flex-shrink-0 px-4 py-2.5 border text-xs font-medium ${
-                      selected
+                      qty > 0
                         ? "bg-[var(--text)] text-[var(--bg)] border-[var(--text)]"
                         : "bg-[var(--surface)] text-[var(--text-secondary)] border-[var(--border)]"
                     }`}
-                    onClick={() => toggleService(service)}
+                    onClick={() => addService(service)}
                   >
                     {service.name} · {formatAmount(service.price)}
+                    {qty > 0 && ` · ×${qty}`}
                   </button>
                 )
               })}
@@ -210,22 +268,54 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
           <div>
             <SectionLabel>All services</SectionLabel>
             <div className="grid grid-cols-2 gap-2.5">
-              {SERVICES.map((service, index) => {
-                const selected = selectedServices.some(
-                  (item) => item.id === service.id,
-                )
-                return (
-                  <ServiceTile
-                    key={service.id}
-                    name={service.name}
-                    price={service.price}
-                    index={index}
-                    selected={selected}
-                    onToggle={() => toggleService(service)}
-                  />
-                )
-              })}
+              {SERVICES.map((service, index) => (
+                <ServiceTile
+                  key={service.id}
+                  name={service.name}
+                  price={service.price}
+                  index={index}
+                  selected={qtyOf(service.id) > 0}
+                  qty={qtyOf(service.id)}
+                  onToggle={() => addService(service)}
+                />
+              ))}
             </div>
+
+            {/* The services on the bill, with how many of each: three people, three haircuts. */}
+            {menuServiceGroups.length > 0 && (
+              <div className="mt-3 flex flex-col gap-2" aria-label="Selected services">
+                {menuServiceGroups.map((id) => {
+                  const service = SERVICES.find((x) => x.id === id)!
+                  const qty = qtyOf(id)
+                  return (
+                    <div key={id} className="flex items-center gap-3 bg-[var(--surface)] border border-[var(--border-subtle)] p-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm text-[var(--text)] truncate">{service.name}</div>
+                        <div className="text-xs text-[var(--text-muted)] mt-0.5">
+                          {formatAmount(service.price)} each
+                          {qty > 1 && ` · ${formatAmount(round2(service.price * qty))}`}
+                        </div>
+                      </div>
+                      <button
+                        aria-label={`One less ${service.name}`}
+                        className="w-8 h-8 flex items-center justify-center border border-[var(--border)] text-[var(--text)]"
+                        onClick={() => removeServiceUnit(id)}
+                      >
+                        <Minus size={12} />
+                      </button>
+                      <span className="font-display font-700 text-sm text-[var(--text)] w-5 text-center">{qty}</span>
+                      <button
+                        aria-label={`One more ${service.name}`}
+                        className="w-8 h-8 flex items-center justify-center border border-[var(--border)] text-[var(--text)]"
+                        onClick={() => addService(service)}
+                      >
+                        <Plus size={12} />
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
 
             <div className="mt-3 flex flex-col gap-2">
               {customServices.map((service) => (
@@ -295,33 +385,46 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
                 No products in the catalogue yet. You can still add a custom product below.
               </div>
             )}
-            <div className="grid grid-cols-3 gap-2">
-              {CATALOG.map((product) => (
-                <button
-                  key={product.name}
-                  className="bg-[var(--surface)] border border-[var(--border-subtle)] overflow-hidden text-left"
-                  onClick={() => updateCatalogProduct(product)}
-                >
-                  {product.image ? (
-                    <img
-                      src={product.image}
-                      alt=""
-                      className="w-full h-20 object-cover grayscale"
-                    />
-                  ) : (
-                    <div className="w-full h-20 bg-[var(--elevated)]" />
-                  )}
-                  <div className="p-2">
-                    <div className="font-display font-700 text-xs text-[var(--text)] truncate">
-                      {product.name}
+            <HScroller label="products" itemClass="w-36 md:w-52">
+              {CATALOG.map((product) => {
+                // A product that has been added to the bill shows in colour, with a border and how many were added.
+                const qty = products.filter((p) => p.name === product.name).reduce((n, p) => n + p.qty, 0)
+                const selected = qty > 0
+                return (
+                  <button
+                    key={product.name}
+                    aria-pressed={selected}
+                    className={`relative block w-full overflow-hidden border text-left bg-[var(--surface)] transition-colors ${
+                      selected ? "border-[var(--text)]" : "border-[var(--border-subtle)]"
+                    }`}
+                    onClick={() => updateCatalogProduct(product)}
+                  >
+                    {selected && (
+                      <span className="absolute right-1.5 top-1.5 z-10 flex h-6 min-w-6 items-center justify-center rounded-full bg-[var(--text)] px-1.5 text-[11px] font-700 text-[var(--bg)]">
+                        ×{qty}
+                      </span>
+                    )}
+                    {product.image ? (
+                      <img
+                        src={product.image}
+                        alt=""
+                        className={`w-full h-30 md:h-60 xl:h-70 object-cover transition-[filter] duration-200 ${
+                          selected ? "" : "grayscale"
+                        }`}
+                      />
+                    ) : (
+                      <div className="w-full h-20 bg-[var(--elevated)]" />
+                    )}
+                    <div className="p-2">
+                      <MiddleEllipsis text={product.name} className="font-display font-700 text-xs text-[var(--text)]" />
+                      <div className="text-[10px] text-[var(--text-muted)] mt-0.5">
+                        {formatAmount(product.price)}
+                      </div>
                     </div>
-                    <div className="text-[10px] text-[var(--text-muted)] mt-0.5">
-                      {formatAmount(product.price)}
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
+                  </button>
+                )
+              })}
+            </HScroller>
 
             <div className="mt-3 flex flex-col gap-2">
               {products.map((product, index) => (
@@ -404,33 +507,29 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
 
           <div>
             <SectionLabel>Discount</SectionLabel>
-            <div className="flex">
-              <Select
-                ariaLabel="Discount type"
-                className="w-[4.5rem] shrink-0 bg-[var(--elevated)] border border-r-0 border-[var(--border)] px-3 font-display font-700 text-base text-[var(--text)] outline-none select-compact"
-                value={discountMode}
-                onChange={(value) => setDiscountMode(value as "amount" | "percent")}
-                options={[
-                  { value: "percent", label: "% Percent", shortLabel: "%" },
-                  { value: "amount", label: "₹ Amount", shortLabel: "₹" },
-                ]}
-              />
-              <input
-                type="number"
-                inputMode="decimal"
-                className="flex-1 min-w-0 bg-[var(--surface)] border border-[var(--border)] px-4 py-3 text-[var(--text)] outline-none"
-                placeholder="0"
-                value={discountValue || ""}
-                onChange={(event) =>
-                  setDiscountValue(Number(event.target.value) || 0)
-                }
-              />
-            </div>
-            {discount > 0 && (
-              <div className="text-[10px] text-[var(--text-muted)] mt-2">
-                You’re applying a {formatAmount(discount)} discount.
+            {startedWithBranchDiscount && (
+              <div className="mb-3 text-[11px] leading-relaxed text-[var(--text-muted)]">
+                This branch's discount is applied. You can change it for this bill.
               </div>
             )}
+            <div className="flex flex-col gap-3">
+              {!productOnly && (
+                <DiscountRow
+                  label="Services"
+                  field={serviceDiscountField}
+                  onChange={setServiceDiscountField}
+                  taken={serviceDiscountAmount}
+                  base={serviceTotal}
+                />
+              )}
+              <DiscountRow
+                label="Products"
+                field={productDiscountField}
+                onChange={setProductDiscountField}
+                taken={productDiscountAmount}
+                base={productTotal}
+              />
+            </div>
           </div>
 
           <div>
@@ -495,20 +594,34 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
 
           <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-4">
             <SectionLabel>Summary</SectionLabel>
-            <AmountRow label="Services" value={formatAmount(serviceTotal)} />
-            {productTotal > 0 && (
-              <AmountRow label="Products" value={formatAmount(productTotal)} />
+            {serviceLines.length === 0 && productLines.length === 0 && (
+              <div className="text-xs text-[var(--text-muted)] pb-2">Nothing selected yet.</div>
             )}
-            {discount > 0 && (
+            {serviceLines.map((line) => (
               <AmountRow
-                label="Discount"
-                value={`-${formatAmount(discount)}`}
-                muted
+                key={`s-${line.name}-${line.price}`}
+                label={withQty(line.name || "Custom service", line.qty)}
+                value={line.total === 0 ? "FREE" : formatAmount(line.total)}
               />
-            )}
-            {tip > 0 && (
-              <AmountRow label={`Tip (${tipMode})`} value={formatAmount(tip)} />
-            )}
+            ))}
+            {productLines.map((line) => (
+              <AmountRow key={`p-${line.name}-${line.price}`} label={withQty(line.name, line.qty)} value={formatAmount(line.total)} />
+            ))}
+            <div className="border-t border-[var(--border-subtle)] mt-2 pt-2">
+              {serviceLines.length > 0 && productTotal > 0 && (
+                <>
+                  <AmountRow label="Services" value={formatAmount(serviceTotal)} muted />
+                  <AmountRow label="Products" value={formatAmount(productTotal)} muted />
+                </>
+              )}
+              {serviceDiscountAmount > 0 && (
+                <AmountRow label="Discount on services" value={`-${formatAmount(serviceDiscountAmount)}`} muted />
+              )}
+              {productDiscountAmount > 0 && (
+                <AmountRow label="Discount on products" value={`-${formatAmount(productDiscountAmount)}`} muted />
+              )}
+              {tip > 0 && <AmountRow label={`Tip (${tipMode})`} value={formatAmount(tip)} />}
+            </div>
             <div className="border-t border-[var(--border-subtle)] mt-2 pt-3">
               <AmountRow label="Total" value={formatAmount(total)} bold />
             </div>
@@ -572,8 +685,8 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
                 paymentMode,
                 products,
                 discount,
-                discountType: discountMode,
-                discountValue,
+                serviceDiscount,
+                productDiscount,
                 whatsappTo: !session.customerPhone && isValidPhone(whatsapp) ? whatsapp : undefined,
               })
               if (chatWindow) {
@@ -618,6 +731,24 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
   )
 }
 
+/** One line that never spills out of its card: a long name is cut in the middle and ends with its last two words. */
+function MiddleEllipsis({ text, className = "" }: { text: string; className?: string }) {
+  const words = text.trim().split(/\s+/)
+  if (words.length <= 3) {
+    return (
+      <div title={text} className={`truncate ${className}`}>
+        {text}
+      </div>
+    )
+  }
+  return (
+    <div title={text} className={`flex min-w-0 ${className}`}>
+      <span className="min-w-0 truncate">{words.slice(0, -2).join(" ")}</span>
+      <span className="max-w-[60%] shrink-0 truncate">&nbsp;{words.slice(-2).join(" ")}</span>
+    </div>
+  )
+}
+
 function Segmented<T extends "cash" | "gpay">({
   value,
   onChange,
@@ -640,6 +771,60 @@ function Segmented<T extends "cash" | "gpay">({
           {mode === "gpay" ? "GPay" : "Cash"}
         </button>
       ))}
+    </div>
+  )
+}
+
+/** One discount: % or ₹ and the number, and what it takes off. */
+function DiscountRow({
+  label,
+  field,
+  onChange,
+  taken,
+  base,
+}: {
+  label: string
+  field: DiscountField
+  onChange: (next: DiscountField) => void
+  taken: number
+  base: number
+}) {
+  return (
+    <div>
+      <div className="mb-1.5 flex items-baseline justify-between text-xs">
+        <span className="text-[var(--text-secondary)]">{label}</span>
+        <span className="text-[var(--text-muted)]">
+          {base > 0 ? (taken > 0 ? `-${formatAmount(taken)} off ${formatAmount(base)}` : `on ${formatAmount(base)}`) : "nothing to discount yet"}
+        </span>
+      </div>
+      <div className="flex">
+        <Select
+          ariaLabel={`${label} discount type`}
+          className="w-[4.5rem] shrink-0 bg-[var(--elevated)] border border-r-0 border-[var(--border)] px-3 font-display font-700 text-base text-[var(--text)] outline-none select-compact"
+          value={field.mode}
+          onChange={(value) => onChange({ ...field, mode: value as DiscountMode })}
+          options={[
+            { value: "percent", label: "% Percent", shortLabel: "%" },
+            { value: "amount", label: "₹ Amount", shortLabel: "₹" },
+          ]}
+        />
+        <input
+          type="text"
+          inputMode="decimal"
+          aria-label={`${label} discount`}
+          className="flex-1 min-w-0 bg-[var(--surface)] border border-[var(--border)] px-4 py-3 text-[var(--text)] outline-none"
+          placeholder="0"
+          value={field.value}
+          onChange={(event) => {
+            // digits and one decimal point only, at most 2 decimals; a percentage never goes past 100
+            let text = event.target.value.replace(/[^\d.]/g, "")
+            const dot = text.indexOf(".")
+            if (dot >= 0) text = text.slice(0, dot + 1) + text.slice(dot + 1).replace(/\./g, "").slice(0, 2)
+            if (field.mode === "percent" && Number(text) > 100) text = "100"
+            onChange({ ...field, value: text.slice(0, 9) })
+          }}
+        />
+      </div>
     </div>
   )
 }

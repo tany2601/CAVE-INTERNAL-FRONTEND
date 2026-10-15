@@ -26,6 +26,7 @@ import type {
   ApiTransactionType,
   Paginated,
   SummaryPeriod,
+  BranchDiscountConfig,
 } from "../../types/api"
 
 const MAX = 100 // backend page-size ceiling
@@ -93,12 +94,14 @@ export interface StaffInput {
   name: string
   roleId: string
   branchId: string
-  monthlySalary?: number
-  phone?: string
+  // On an edit, null clears the value (the server treats a missing field as "leave it as it is").
+  monthlySalary?: number | null
+  phone?: string | null
   photoUrl?: string
-  dailyRevenueTarget?: number
-  monthlyRevenueTarget?: number
-  commissionModel?: ApiCommissionModel
+  dailyRevenueTarget?: number | null
+  monthlyRevenueTarget?: number | null
+  /** null (or left out) means no commission. */
+  commissionModel?: ApiCommissionModel | null
   flatCommissionPercentage?: number
   dailyTargetAmount?: number
   commissionSlabs?: ApiStaffSlab[]
@@ -282,6 +285,18 @@ export const uploadImage = (file: File, folder: "staff" | "branches" | "products
 // ── WhatsApp ─────────────────────────────────────────────────────────
 export type WhatsappMode = "off" | "api" | "manual"
 
+/** When the scheduled reports go out (Indian time). */
+export interface ReportTimes {
+  /** "HH:MM", 24-hour */
+  dailyTime: string
+  /** 0 = Sunday … 6 = Saturday */
+  weeklyDay: number
+  weeklyTime: string
+  /** 1 to 28 */
+  monthlyDay: number
+  monthlyTime: string
+}
+
 export interface WhatsappStatus {
   /** True once the server has its WhatsApp keys; nothing can be sent before that. */
   configured: boolean
@@ -294,6 +309,7 @@ export interface WhatsappStatus {
   monthly: boolean
   /** Send the full Excel report with each report message. */
   excel: boolean
+  times: ReportTimes
   /** Sending is paused (WhatsApp complained, or the token failed); null when running normally. */
   paused: { until: string; reason: string } | null
   pausedScope: "all" | "offers" | null
@@ -321,7 +337,7 @@ export interface WhatsappMessageRow {
 export const getWhatsapp = () => request<WhatsappStatus>("GET", "/admin/whatsapp")
 
 export const saveWhatsapp = (
-  body: Pick<WhatsappStatus, "phones" | "daily" | "weekly" | "monthly" | "excel" | "mode" | "billFormat">,
+  body: Pick<WhatsappStatus, "phones" | "daily" | "weekly" | "monthly" | "excel" | "times" | "mode" | "billFormat">,
 ) =>
   request<WhatsappStatus>("PUT", "/admin/whatsapp", { body })
 
@@ -438,3 +454,17 @@ export const downloadAssistantReport = (from: string, to: string, branchId: stri
   requestBlob(
     `/admin/assistant/report?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${branchId ? `&branchId=${encodeURIComponent(branchId)}` : ""}`,
   )
+
+// ── Discounts (per branch) ───────────────────────────────────────────
+
+export interface BranchDiscountRow extends BranchDiscountConfig {
+  branchId: string
+  branchName: string
+  isActive: boolean
+}
+
+export const listDiscounts = () =>
+  request<{ data: BranchDiscountRow[] }>("GET", "/admin/discounts").then((r) => r.data)
+
+export const saveDiscount = (branchId: string, body: BranchDiscountConfig) =>
+  request<unknown>("PUT", `/admin/discounts/${branchId}`, { body })

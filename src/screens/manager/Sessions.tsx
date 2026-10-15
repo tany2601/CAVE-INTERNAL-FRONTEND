@@ -6,6 +6,7 @@ import { useBranchData } from "../../context/BranchDataContext"
 import { staffApi } from "../../lib/api"
 import { Session } from "../../types"
 import { Clock } from "lucide-react"
+import { groupLines, withQty } from "../../lib/billing"
 import { ManagerNav } from "../../components/layout"
 
 interface Props {
@@ -106,12 +107,12 @@ export default function Sessions({
                   </div>
                   <div className="flex items-center border-t border-[var(--border-subtle)]">
                     <div className="flex-1 min-w-0 px-4 py-2.5 flex gap-1.5 flex-wrap">
-                      {session.services.map((s) => (
+                      {groupLines(session.services).map((s) => (
                         <span
-                          key={s.id}
+                          key={`${s.name}-${s.price}`}
                           className="text-[9px] bg-[var(--elevated)] border border-[var(--border-subtle)] px-2 py-0.5 rounded-full text-[var(--text-muted)]"
                         >
-                          {s.name}
+                          {withQty(s.name, s.qty)}
                         </span>
                       ))}
                     </div>
@@ -169,12 +170,12 @@ export default function Sessions({
                   </div>
                   <div className="border-t border-[var(--border-subtle)] px-4 py-2.5 flex items-center justify-between">
                     <div className="flex gap-1.5 flex-wrap">
-                      {session.services.map((s) => (
+                      {groupLines(session.services).map((s) => (
                         <span
-                          key={s.id}
+                          key={`${s.name}-${s.price}`}
                           className="text-[9px] bg-[var(--elevated)] border border-[var(--border-subtle)] px-2 py-0.5 rounded-full text-[var(--text-muted)]"
                         >
-                          {s.name}
+                          {withQty(s.name, s.qty)}
                         </span>
                       ))}
                       {session.tip && session.tip > 0 && (

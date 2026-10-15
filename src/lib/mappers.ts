@@ -18,6 +18,15 @@ const mode = (m: ApiPaymentMode | null): "cash" | "gpay" | undefined =>
 export const toApiMode = (m: "cash" | "gpay"): ApiPaymentMode =>
   m === "gpay" ? "GPAY" : "CASH"
 
+const part = (
+  type: ApiSession["discountType"] | undefined,
+  value: number | undefined,
+  amount: number | undefined,
+): Session["serviceDiscount"] =>
+  type === "PERCENTAGE" || type === "FIXED"
+    ? { mode: type === "PERCENTAGE" ? "percent" : "amount", value: value ?? 0, amount: amount ?? 0 }
+    : undefined
+
 export const mapSession = (s: ApiSession): Session => ({
   id: s.id,
   customerName: s.customerName,
@@ -54,6 +63,8 @@ export const mapSession = (s: ApiSession): Session => ({
         ? "amount"
         : undefined,
   discountValue: s.discountValue || undefined,
+  serviceDiscount: part(s.serviceDiscountType, s.serviceDiscountValue, s.serviceDiscountAmount),
+  productDiscount: part(s.productDiscountType, s.productDiscountValue, s.productDiscountAmount),
   isEdited: s.isEdited,
   freeVisit: s.isFreeVisit || undefined,
 })

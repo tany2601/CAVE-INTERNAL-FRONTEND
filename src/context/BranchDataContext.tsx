@@ -18,7 +18,8 @@ import {
 import { useAuth } from "./AuthContext"
 import { MESSAGES } from "../lib/errors"
 import type { Expense, Service, Session, Stylist } from "../types"
-import type { ApiCheckoutProduct, ApiDay, ApiPayout } from "../types/api"
+import type { ApiCheckoutProduct, ApiDay, ApiPayout, BranchDiscountConfig } from "../types/api"
+import { sortByCategory } from "../lib/menuOrder"
 
 const POLL_MS = 30_000
 const CATALOGUE_TTL_MS = 5 * 60_000
@@ -43,6 +44,8 @@ interface BranchData {
   day: ApiDay | null
   /** How closed bills reach customers (set by the admin in Settings). */
   whatsapp: { mode: "off" | "api" | "manual"; billFormat: "text" | "image" }
+  /** The discount the admin set for this branch; billing starts with it when switched on. */
+  discount: BranchDiscountConfig
   getStylist: (id: string) => Stylist | undefined
   refresh: () => Promise<void>
   /** Show a just-created session straight away, before the next refresh confirms it. */
@@ -50,6 +53,12 @@ interface BranchData {
 }
 
 const BranchDataContext = createContext<BranchData | null>(null)
+
+const NO_DISCOUNT: BranchDiscountConfig = {
+  enabled: false,
+  services: { type: "PERCENTAGE", value: 0 },
+  products: { type: "PERCENTAGE", value: 0 },
+}
 
 const EMPTY: Omit<
   BranchData,
@@ -65,6 +74,7 @@ const EMPTY: Omit<
   payouts: [],
   day: null,
   whatsapp: { mode: "off", billFormat: "text" },
+  discount: NO_DISCOUNT,
 }
 
 /** Loads and keeps fresh the branch-scoped data the stylist/manager screens render. */
@@ -97,7 +107,7 @@ export function BranchDataProvider({ children }: { children: ReactNode }) {
       setData((prev) => ({
         branchName: today.branch.name,
         stylists: today.stylists.map(mapStylist),
-        services: catalogue ? catalogue[0].map(mapService) : prev.services,
+        services: catalogue ? sortByCategory(catalogue[0]).map(mapService) : prev.services,
         products: catalogue ? catalogue[1] : prev.products,
         activeSessions: today.activeSessions.map(mapSession),
         closedSessions: today.closedSessions.map(mapSession),
@@ -105,6 +115,7 @@ export function BranchDataProvider({ children }: { children: ReactNode }) {
         payouts: today.payouts,
         day: today.day,
         whatsapp: today.whatsapp ?? { mode: "off", billFormat: "text" },
+        discount: today.discount ?? NO_DISCOUNT,
       }))
       setError(null)
     } catch (e) {

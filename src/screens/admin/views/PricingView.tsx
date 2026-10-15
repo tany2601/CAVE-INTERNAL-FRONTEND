@@ -1,25 +1,28 @@
 import { EmptyNote } from "../../../components/ui"
 import { useEffect, useState } from "react"
-import {
-  Plus,
-  Save,
-  Trash2,
-} from "lucide-react"
+import { Plus, Save, Trash2 } from "lucide-react"
 import { adminApi } from "../../../lib/api"
 import { useAsyncData } from "../../../hooks/useAsyncData"
+import { CATEGORY_ORDER, categoryOf, sortByCategory } from "../../../lib/menuOrder"
 import { formatMoney } from "../adminTypes"
 import { AsyncNotice, PageHeading, ViewMoreButton } from "../components"
 import { useAdminActions } from "../hooks/useAdminActions"
+import { useUnsavedChanges } from "../hooks/useUnsavedChanges"
 
 interface PricingRow {
   pricingId: string
   serviceId: string
   name: string
-  price: number
-  category: string | null
+  /** What is typed in the amount box (kept as text so a digit can be deleted without the whole box going to 0). */
+  priceText: string
+  /** Hair, Beard, Skin, Combo or Other: decides which group of the list the service is in. */
+  category: string
   savedName: string
   savedPrice: number
 }
+
+const ALL = "All"
+const rowDirty = (r: PricingRow) => r.name !== r.savedName || r.priceText !== String(r.savedPrice)
 
 export const PricingView = () => {
   const actions = useAdminActions()
@@ -31,6 +34,7 @@ export const PricingView = () => {
   const [price, setPrice] = useState("")
   const [saved, setSaved] = useState(false)
   const [limit, setLimit] = useState(8)
+  const [filter, setFilter] = useState(ALL)
 
   const branch = branches.find((b) => b.id === branchId)
 
@@ -43,26 +47,46 @@ export const PricingView = () => {
     [branchId],
   )
 
+  // When fresh data arrives (after saving, or a background refresh), rows being edited keep what was typed:
+  // only the saved values behind them are updated. Everything else just takes the new values.
   useEffect(() => {
-    setItems(
-      (pricing.data ?? []).map((p) => ({
-        pricingId: p.id,
-        serviceId: p.serviceId,
-        name: p.service.name,
-        price: p.price,
-        category: p.service.category,
-        savedName: p.service.name,
-        savedPrice: p.price,
-      })),
-    )
+    const fresh = sortByCategory(
+      (pricing.data ?? []).map((p) => ({ p, name: p.service.name, category: p.service.category })),
+    ).map(({ p }) => p)
+    setItems((previous) => {
+      const before = new Map(previous.map((r) => [r.pricingId, r]))
+      return fresh.map((p) => {
+        const old = before.get(p.id)
+        const base: PricingRow = {
+          pricingId: p.id,
+          serviceId: p.serviceId,
+          name: p.service.name,
+          priceText: String(p.price),
+          category: categoryOf(p.service.name, p.service.category),
+          savedName: p.service.name,
+          savedPrice: p.price,
+        }
+        return old && rowDirty(old) ? { ...old, category: base.category, savedName: base.savedName, savedPrice: base.savedPrice } : base
+      })
+    })
   }, [pricing.data])
 
-  const dirty = items.filter((i) => i.name !== i.savedName || i.price !== i.savedPrice)
-  const categories = items.reduce<Record<string, number>>((acc, item) => {
-    const key = item.category || "All services"
-    acc[key] = (acc[key] ?? 0) + 1
+  const dirty = items.filter(rowDirty)
+  const incomplete = items.some((r) => r.priceText === "" || r.name.trim() === "")
+  useUnsavedChanges(dirty.length > 0)
+
+  // Catalogue index: All, then each group that has services, in menu order.
+  const counts = items.reduce<Record<string, number>>((acc, item) => {
+    acc[item.category] = (acc[item.category] ?? 0) + 1
     return acc
   }, {})
+  const groups = [
+    ...CATEGORY_ORDER.filter((c) => counts[c]),
+    ...Object.keys(counts).filter((c) => !CATEGORY_ORDER.includes(c) && c !== "Other"),
+    ...(counts.Other ? ["Other"] : []),
+  ]
+  const active = filter === ALL || counts[filter] ? filter : ALL
+  const shown = active === ALL ? items : items.filter((i) => i.category === active)
 
   const addService = async () => {
     const trimmed = name.trim()
@@ -82,13 +106,30 @@ export const PricingView = () => {
       if (row.name !== row.savedName) {
         await adminApi.updateService(row.serviceId, { name: row.name.trim() })
       }
-      if (row.price !== row.savedPrice) {
-        await adminApi.updateBranchPricing(branchId, row.pricingId, { price: row.price })
+      if (row.priceText !== String(row.savedPrice)) {
+        await adminApi.updateBranchPricing(branchId, row.pricingId, { price: Number(row.priceText) })
       }
     }
     setSaved(true)
     window.setTimeout(() => setSaved(false), 2000)
     await pricing.reload()
+  }
+
+  const switchBranch = (id: string) => {
+    if (id === branchId) return
+    const go = () => {
+      setBranchId(id)
+      setLimit(8)
+      setFilter(ALL)
+    }
+    if (dirty.length === 0) return go()
+    actions.request({
+      title: "Switch branch?",
+      message: "You have unsaved changes on this menu. If you switch now they will be undone.",
+      confirmLabel: "Switch and undo changes",
+      destructive: true,
+      action: async () => go(),
+    })
   }
 
   const busy = (branchesState.loading && !branchesState.data) || (pricing.loading && !pricing.data)
@@ -108,10 +149,7 @@ export const PricingView = () => {
               <button
                 key={item.id}
                 className={branchId === item.id ? "active" : ""}
-                onClick={() => {
-                  setBranchId(item.id)
-                  setLimit(8)
-                }}
+                onClick={() => switchBranch(item.id)}
               >
                 {item.name}
               </button>
@@ -131,10 +169,18 @@ export const PricingView = () => {
         <div className="grid lg:grid-cols-[14rem_1fr] gap-5 mt-7">
           <aside className="pricing-index">
             <div className="admin-kicker">Catalogue index</div>
-            {Object.entries(categories).map(([label, count], index) => (
-              <button key={label} className={index === 0 ? "active" : ""}>
+            {[ALL, ...groups].map((label) => (
+              <button
+                key={label}
+                className={active === label ? "active" : ""}
+                aria-pressed={active === label}
+                onClick={() => {
+                  setFilter(label)
+                  setLimit(8)
+                }}
+              >
                 <span>{label}</span>
-                <strong>{count}</strong>
+                <strong>{label === ALL ? items.length : counts[label]}</strong>
               </button>
             ))}
             <div className="pricing-sync-note">
@@ -148,7 +194,7 @@ export const PricingView = () => {
               <div>
                 <div className="admin-kicker">{branch?.name ?? ""}</div>
                 <div className="font-display font-800 text-2xl mt-1">
-                  {items.length} services
+                  {active === ALL ? `${items.length} services` : `${shown.length} ${active.toLowerCase()} ${shown.length === 1 ? "service" : "services"}`}
                 </div>
               </div>
               <span className="text-[10px] text-[var(--text-muted)]">
@@ -187,16 +233,19 @@ export const PricingView = () => {
               </button>
             </div>
             <div className="flex flex-col">
-              {items.length === 0 && (
-                <EmptyNote>No services are priced for this branch yet.</EmptyNote>
+              {shown.length === 0 && (
+                <EmptyNote>
+                  {items.length === 0 ? "No services are priced for this branch yet." : "No services in this group."}
+                </EmptyNote>
               )}
-              {items.slice(0, limit).map((row, index) => (
+              {shown.slice(0, limit).map((row, index) => (
                 <div key={row.pricingId} className="pricing-row">
                   <span className="pricing-row-number">
                     {String(index + 1).padStart(2, "0")}
                   </span>
                   <input
                     value={row.name}
+                    aria-label="Service name"
                     onChange={(event) =>
                       setItems((current) =>
                         current.map((item) =>
@@ -210,16 +259,15 @@ export const PricingView = () => {
                   <label>
                     <span>₹</span>
                     <input
-                      value={row.price}
+                      value={row.priceText}
                       inputMode="numeric"
+                      aria-label={`Price of ${row.name}`}
+                      aria-invalid={row.priceText === ""}
                       onChange={(event) =>
                         setItems((current) =>
                           current.map((item) =>
                             item.pricingId === row.pricingId
-                              ? {
-                                  ...item,
-                                  price: Number(event.target.value.replace(/\D/g, "")),
-                                }
+                              ? { ...item, priceText: event.target.value.replace(/\D/g, "").slice(0, 7) }
                               : item,
                           ),
                         )
@@ -247,14 +295,15 @@ export const PricingView = () => {
                 </div>
               ))}
             </div>
-            {items.length > limit && (
+            {shown.length > limit && (
               <ViewMoreButton onClick={() => setLimit((value) => value + 8)} />
             )}
           </section>
         </div>
         <button
           className="pricing-save-button"
-          disabled={dirty.length === 0}
+          disabled={dirty.length === 0 || incomplete}
+          title={dirty.length === 0 ? "Nothing to save yet" : incomplete ? "Fill in every name and price first" : undefined}
           onClick={() =>
             actions.request({
               title: "Save and sync this menu?",

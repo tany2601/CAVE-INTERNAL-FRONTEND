@@ -57,9 +57,10 @@ html[data-ui='v2'] .admin-secondary-button,
 html[data-ui='v2'] .pricing-branch-switcher button,
 html[data-ui='v2'] .pricing-add-row button { font-size: 0.76rem; }
 html[data-ui='v2'] .admin-danger-button { font-size: 0.74rem; }
-html[data-ui='v2'] .branch-target-dial span,
-html[data-ui='v2'] .retention-ring span,
 html[data-ui='v2'] .employee-performance-block span { font-size: 0.68rem; }
+/* Labels inside the progress circles: bigger than before, but small enough to sit inside the ring */
+html[data-ui='v2'] .branch-target-dial span,
+html[data-ui='v2'] .retention-ring span { font-size: 0.62rem; letter-spacing: 0.06em; }
 html[data-ui='v2'] .branch-finance-flow span,
 html[data-ui='v2'] .commission-command-metric span,
 html[data-ui='v2'] .customer-hero-stat small,

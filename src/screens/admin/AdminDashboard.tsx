@@ -10,6 +10,7 @@ import {
   Menu,
   Moon,
   Package,
+  BadgePercent,
   RefreshCw,
   ReceiptText,
   Settings,
@@ -32,6 +33,7 @@ import type { AdminSection } from "./adminTypes"
 import { useAdminActions } from "./hooks/useAdminActions"
 import type { BranchTab, Period } from "./types"
 import { AssistantDock } from "./assistant/AssistantDock"
+import { hasUnsavedChanges } from "./hooks/useUnsavedChanges"
 import {
   Overview,
   BranchDetail,
@@ -48,6 +50,7 @@ import {
   BranchPulseView,
   PricingView,
   ProductsView,
+  DiscountsView,
 } from "./views"
 
 interface Props {
@@ -84,6 +87,7 @@ const navGroups: AdminNavGroup[] = [
       { id: "expenses" as const, label: "Expenses", icon: ReceiptText },
       { id: "pricing" as const, label: "Menu pricing", icon: Tags },
       { id: "products" as const, label: "Products", icon: Package },
+      { id: "discounts" as const, label: "Discounts", icon: BadgePercent },
     ],
   },
   {
@@ -137,7 +141,21 @@ export default function AdminDashboard({ onLogout, theme, onThemeToggle }: Props
   const [branchTab, setBranchTab] = useState<BranchTab>("summary")
   const [period, setPeriod] = useState<Period>("Today")
 
-  const navigate = (next: AdminSection) => {
+  /** Runs `go`, but first asks when the page being left has unsaved edits (they would be lost). */
+  const leaveIfSafe = (go: () => void) => {
+    if (!hasUnsavedChanges()) return go()
+    adminActions.request({
+      title: "Leave this page?",
+      message: "You have unsaved changes. If you leave now they will be undone.",
+      confirmLabel: "Leave and undo changes",
+      destructive: true,
+      action: async () => go(),
+    })
+  }
+
+  const navigate = (next: AdminSection) => leaveIfSafe(() => goTo(next))
+
+  const goTo = (next: AdminSection) => {
     setSection(next)
     try {
       sessionStorage.setItem(storageKeys.adminSection, next)
@@ -196,8 +214,9 @@ export default function AdminDashboard({ onLogout, theme, onThemeToggle }: Props
             onClick={() =>
               adminActions.request({
                 title: "Log out of Admin?",
-                message:
-                  "You will return to the role selection screen and need the Admin PIN to enter again.",
+                message: `${
+                  hasUnsavedChanges() ? "You have unsaved changes that will be lost. " : ""
+                }You will return to the role selection screen and need the Admin PIN to enter again.`,
                 confirmLabel: "Yes, log out",
                 destructive: true,
                 action: onLogout,
@@ -339,6 +358,7 @@ export default function AdminDashboard({ onLogout, theme, onThemeToggle }: Props
             {section === "retention" && <RetentionView />}
             {section === "pricing" && <PricingView />}
             {section === "products" && <ProductsView />}
+            {section === "discounts" && <DiscountsView />}
           </>
         )}
       </main>

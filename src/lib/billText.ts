@@ -1,4 +1,5 @@
 import { formatAmount } from "./format"
+import { groupLines, withQty } from "./billing"
 
 /** A line's price, or FREE for a ₹0 line (the free-haircut visit). */
 const price = (n: number) => (n === 0 ? "FREE" : formatAmount(n))
@@ -27,9 +28,10 @@ export function billText(b: BillTextInput): string {
     `*${b.branchName}*`,
     first ? `Thank you for visiting us, ${first}!` : "Thank you for visiting us!",
     "",
-    ...b.services.map((s) => `• ${s.name}  ${price(s.price)}`),
-    ...b.products.flatMap((p) =>
-      Array.from({ length: p.qty }, () => `• ${p.name}  ${price(p.price)}`),
+    // The same service several times (a customer paying for friends too) is one line with a quantity.
+    ...groupLines(b.services).map((s) => `• ${withQty(s.name, s.qty)}  ${price(s.total)}`),
+    ...groupLines(b.products.flatMap((p) => Array.from({ length: p.qty }, () => ({ name: p.name, price: p.price })))).map(
+      (p) => `• ${withQty(p.name, p.qty)}  ${price(p.total)}`,
     ),
   ]
   if (b.discountAmount > 0) lines.push(`Discount  -${formatAmount(b.discountAmount)}`)

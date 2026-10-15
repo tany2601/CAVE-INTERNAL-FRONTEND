@@ -694,6 +694,10 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
   letter-spacing: 0.1em;
   text-transform: uppercase;
   opacity: 0.55;
+  /* Centred and kept narrow so a two-line label stays inside the circle instead of running past its edge */
+  text-align: center;
+  line-height: 1.2;
+  max-width: 72%;
 }
 
 .branch-detail-toolbar {
@@ -1433,6 +1437,9 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
   font-size: 0.5rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
+  text-align: center;
+  line-height: 1.2;
+  max-width: 72%;
 }
 
 .retention-periods {
@@ -1653,6 +1660,16 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
   opacity: 0.3;
 }
 
+.pricing-index > button { cursor: pointer; }
+.pricing-save-button:disabled {
+  /* Solid, not faded: a see-through button lets the list behind it show through the label. */
+  opacity: 1;
+  cursor: not-allowed;
+  background: var(--elevated-strong);
+  color: var(--text-subtle);
+  border: 1px solid var(--border);
+  box-shadow: 0 0.75rem 2rem rgba(0, 0, 0, 0.35);
+}
 .pricing-save-button {
   position: sticky;
   bottom: 1rem;
@@ -2017,3 +2034,7 @@ html.assistant-open #root { overflow: hidden !important; }
 /* Screens where customers type (name, phone): the page must not scroll or shift when the keyboard opens. */
 html.keyboard-stable #root { overflow: hidden; }
 html.keyboard-stable, html.keyboard-stable body { overscroll-behavior: none; }
+
+/* Sliding rows (products, services on the billing screen): no scrollbar, the arrows do the job */
+.hscroller { scrollbar-width: none; -ms-overflow-style: none; }
+.hscroller::-webkit-scrollbar { display: none; }

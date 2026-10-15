@@ -22,9 +22,12 @@ const MODEL_LABELS: Record<ApiCommissionModel, string> = {
   DAILY_TARGET: "Daily Target",
   MONTHLY_TARGET: "Monthly Target",
 }
+/** "None" is no commission model at all: the employee earns no commission. */
+const NO_MODEL = "None"
+const MODEL_OPTIONS = [NO_MODEL, ...Object.values(MODEL_LABELS)]
 const MODEL_BY_LABEL = Object.fromEntries(
   Object.entries(MODEL_LABELS).map(([k, v]) => [v, k]),
-) as Record<string, ApiCommissionModel>
+) as Record<string, ApiCommissionModel | undefined>
 
 const num = (v: number | string | null | undefined) =>
   v === null || v === undefined || v === "" ? 0 : Number(v)
@@ -119,8 +122,8 @@ export function StaffManagementView() {
                   {item.dailyRevenueTarget
                     ? ` · Daily ${formatMoney(num(item.dailyRevenueTarget))}`
                     : ""}
-                  {commissionSummary(item) && ` · ${commissionSummary(item)}`} ·
-                  Salary {formatMoney(num(item.monthlySalary))}
+                  {commissionSummary(item) && ` · ${commissionSummary(item)}`}
+                  {item.monthlySalary != null && ` · Salary ${formatMoney(num(item.monthlySalary))}`}
                 </div>
               </div>
               <StatusBadge
@@ -245,7 +248,7 @@ function StaffModal({
     existing?.role.name === "MANAGER" ? "Manager" : "Stylist",
   )
   const [model, setModel] = useState(
-    existing?.commissionModel ? MODEL_LABELS[existing.commissionModel] : "Flat %",
+    existing?.commissionModel ? MODEL_LABELS[existing.commissionModel] : NO_MODEL,
   )
   const [name, setName] = useState(existing?.name ?? "")
   const [branchId, setBranchId] = useState(existing?.branchId ?? branches[0]?.id ?? "")
@@ -275,9 +278,13 @@ function StaffModal({
   )
 
   const isStylist = employeeType === "Stylist"
-  const modelKey = MODEL_BY_LABEL[model]
+  const modelKey = MODEL_BY_LABEL[model] // undefined when "None"
+  const editing = data.mode === "edit"
+  // Phone, salary, targets and commission are all optional; once a commission model is chosen its own numbers are needed.
+  const phoneValid = phone === "" || isValidPhone(phone)
   const commissionValid =
     !isStylist ||
+    !modelKey ||
     (modelKey === "FLAT_PERCENTAGE" && flat !== "" && Number(flat) <= 100) ||
     (modelKey === "DAILY_TARGET" && daily !== "") ||
     (modelKey === "MONTHLY_TARGET" &&
@@ -285,32 +292,40 @@ function StaffModal({
   const roleId = roles.find((r) => r.name === employeeType.toUpperCase())?.id
   const branchName = branches.find((b) => b.id === branchId)?.name ?? ""
 
-  const buildInput = (): adminApi.StaffInput => ({
-    name: name.trim(),
-    roleId: roleId as string,
-    branchId,
-    ...(salary !== "" ? { monthlySalary: Number(salary) } : {}),
-    phone: phone.trim(),
-    ...(photo ? { photoUrl: photo } : {}),
-    ...(isStylist && daily !== "" ? { dailyRevenueTarget: Number(daily) } : {}),
-    ...(isStylist && target !== "" ? { monthlyRevenueTarget: Number(target) } : {}),
-    ...(isStylist
-      ? {
-          commissionModel: modelKey,
-          ...(modelKey === "FLAT_PERCENTAGE"
-            ? { flatCommissionPercentage: Number(flat) }
-            : modelKey === "DAILY_TARGET"
-              ? { dailyTargetAmount: Number(daily) }
-              : {
-                  commissionSlabs: slabs.map((s, i) => ({
-                    slabOrder: i + 1,
-                    minRevenue: Number(s.min),
-                    commissionPercentage: Number(s.pct),
-                  })),
-                }),
-        }
-      : {}),
-  })
+  // Adding: empty fields are simply left out. Editing: an emptied field is sent as null so the old value is cleared.
+  const optional = <T,>(value: T | undefined): T | null | undefined => (value !== undefined ? value : editing ? null : undefined)
+  const omitUndefined = <T extends object>(o: T) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T
+
+  const buildInput = (): adminApi.StaffInput =>
+    omitUndefined({
+      name: name.trim(),
+      roleId: roleId as string,
+      branchId,
+      monthlySalary: optional(salary !== "" ? Number(salary) : undefined),
+      phone: optional(phone.trim() !== "" ? phone.trim() : undefined),
+      ...(photo ? { photoUrl: photo } : {}),
+      ...(isStylist
+        ? {
+            dailyRevenueTarget: optional(daily !== "" ? Number(daily) : undefined),
+            monthlyRevenueTarget: optional(target !== "" ? Number(target) : undefined),
+            // No model: leave it out when adding, clear it (null) when editing.
+            commissionModel: modelKey ?? (editing ? null : undefined),
+            ...(modelKey === "FLAT_PERCENTAGE"
+              ? { flatCommissionPercentage: Number(flat) }
+              : modelKey === "DAILY_TARGET"
+                ? { dailyTargetAmount: Number(daily) }
+                : modelKey === "MONTHLY_TARGET"
+                  ? {
+                      commissionSlabs: slabs.map((s, i) => ({
+                        slabOrder: i + 1,
+                        minRevenue: Number(s.min),
+                        commissionPercentage: Number(s.pct),
+                      })),
+                    }
+                  : {}),
+          }
+        : {}),
+    })
 
   return (
     <AdminModal
@@ -368,7 +383,7 @@ function StaffModal({
             maxLength={100}
           />
         </Field>
-        <Field label="Phone number">
+        <Field label="Phone number (optional)">
           <PhoneInput
             className="w-full h-14 px-4 bg-[var(--surface)] border border-[var(--border)] rounded-sm text-[var(--text)] text-base placeholder-[var(--text-faint)] outline-none focus:border-[#3D6FA8] transition-colors"
             value={phone}
@@ -386,11 +401,11 @@ function StaffModal({
           />
         </Field>
         {isStylist && (
-          <Field label="Commission model">
+          <Field label="Commission model (optional)">
             <AdminSelect
               value={model}
               onChange={setModel}
-              options={Object.values(MODEL_LABELS)}
+              options={MODEL_OPTIONS}
               full
             />
           </Field>
@@ -406,7 +421,7 @@ function StaffModal({
           </Field>
         )}
         {isStylist && (
-          <Field label="Daily target">
+          <Field label="Daily target (optional)">
             <Input
               value={daily}
               onChange={(event) => setDaily(event.target.value.replace(/\D/g, ""))}
@@ -416,7 +431,7 @@ function StaffModal({
           </Field>
         )}
         {isStylist && (
-          <Field label="Target">
+          <Field label="Monthly target (optional)">
             <Input
               value={target}
               onChange={(event) => setTarget(event.target.value.replace(/\D/g, ""))}
@@ -425,7 +440,7 @@ function StaffModal({
             />
           </Field>
         )}
-        <Field label="Monthly salary">
+        <Field label="Monthly salary (optional)">
           <Input
             value={salary}
             onChange={(event) => setSalary(event.target.value.replace(/\D/g, ""))}
@@ -475,7 +490,7 @@ function StaffModal({
         className="mt-5"
         disabled={
           !isValidPersonName(name, 2) ||
-          !isValidPhone(phone) ||
+          !phoneValid ||
           !branchId ||
           !roleId ||
           !commissionValid ||

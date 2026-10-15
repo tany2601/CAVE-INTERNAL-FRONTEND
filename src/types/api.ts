@@ -36,6 +36,13 @@ export interface ApiSession {
   discountType: ApiDiscountType
   discountValue: number
   discountAmount: number
+  /** The discount on the services and on the products, kept apart (absent on bills from before this existed). */
+  serviceDiscountType?: ApiDiscountType
+  serviceDiscountValue?: number
+  serviceDiscountAmount?: number
+  productDiscountType?: ApiDiscountType
+  productDiscountValue?: number
+  productDiscountAmount?: number
   isEdited?: boolean
   /** The customer's free-haircut visit (billed), or would be (still open). */
   isFreeVisit?: boolean
@@ -140,6 +147,21 @@ export interface TodayResponse {
   day: ApiDay
   /** How bills reach customers: nothing, sent by the server, or sent by hand from this app. */
   whatsapp?: { mode: "off" | "api" | "manual"; billFormat: "text" | "image" }
+  /** The discount the admin set for this branch (Admin → Discounts). */
+  discount?: BranchDiscountConfig
+}
+
+/** One discount: a percentage or an amount in rupees. */
+export interface DiscountSetting {
+  type: "PERCENTAGE" | "FIXED"
+  value: number
+}
+
+export interface BranchDiscountConfig {
+  /** When on, the billing screen starts with these discounts (staff can still change them on a bill). */
+  enabled: boolean
+  services: DiscountSetting
+  products: DiscountSetting
 }
 
 export interface CustomerLookupResponse {
@@ -156,6 +178,9 @@ export interface CloseSessionPayload {
   productSales?: { productName: string; price: number; paymentMode?: ApiPaymentMode }[]
   discountType?: ApiDiscountType
   discountValue?: number
+  /** A separate discount on the services and on the products (what the billing screen sends). */
+  serviceDiscount?: { type: ApiDiscountType; value: number }
+  productDiscount?: { type: ApiDiscountType; value: number }
   tipAmount?: number
   paymentMode: ApiPaymentMode
   /** Customer's WhatsApp number to send the bill to when none was saved at check-in. */
@@ -286,6 +311,8 @@ export interface OverviewReport {
     id: string
     name: string
     location: string
+    /** City and state only ("Karkala, Karnataka"), for the small branch cards; empty when neither is set. */
+    place?: string
     revenue: number
     customers: number
     active: number

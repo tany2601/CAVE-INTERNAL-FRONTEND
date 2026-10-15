@@ -26,12 +26,31 @@ const MODES: { value: WhatsappMode; title: string; text: string; icon: typeof Po
 ]
 
 const REPORTS = [
-  { key: "daily", label: "Daily", when: "every night at 9:30 PM" },
-  { key: "weekly", label: "Weekly", when: "Monday 9:00 AM, for the week just ended" },
-  { key: "monthly", label: "Monthly", when: "the 1st at 9:00 AM, for the month just ended" },
+  { key: "daily", label: "Daily" },
+  { key: "weekly", label: "Weekly" },
+  { key: "monthly", label: "Monthly" },
 ] as const
 
 type ReportKey = (typeof REPORTS)[number]["key"]
+
+const DEFAULT_TIMES: adminApi.ReportTimes = { dailyTime: "21:30", weeklyDay: 1, weeklyTime: "09:00", monthlyDay: 1, monthlyTime: "09:00" }
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+const DAYS_OF_MONTH = Array.from({ length: 28 }, (_, i) => i + 1)
+const ordinal = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? "th" : ({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[n % 10] ?? "th"}`
+
+/** "21:30" → "9:30 PM" */
+const clock = (hhmm: string) => {
+  const [h, m] = hhmm.split(":").map(Number)
+  return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`
+}
+
+/** One line saying when and what each report covers, from the chosen times. */
+const describe = (key: ReportKey, t: adminApi.ReportTimes) =>
+  key === "daily"
+    ? `Every day at ${clock(t.dailyTime)}, for that day`
+    : key === "weekly"
+      ? `Every ${WEEKDAYS[t.weeklyDay]} at ${clock(t.weeklyTime)}, for the 7 days before`
+      : `On the ${ordinal(t.monthlyDay)} of each month at ${clock(t.monthlyTime)}, for the month just ended`
 
 /** Today's date in India as YYYY-MM-DD (what the date fields and the server use). */
 const todayIst = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" })
@@ -53,6 +72,7 @@ export function WhatsappPanel() {
   const [dirty, setDirty] = useState(false)
   const [testing, setTesting] = useState(false)
   const [excel, setExcel] = useState(true)
+  const [times, setTimes] = useState<adminApi.ReportTimes>(DEFAULT_TIMES)
   const [from, setFrom] = useState(todayIst)
   const [to, setTo] = useState(todayIst)
   const [downloading, setDownloading] = useState(false)
@@ -68,6 +88,7 @@ export function WhatsappPanel() {
     setMode(loaded.mode)
     setBillFormat(loaded.billFormat)
     setExcel(loaded.excel)
+    setTimes(loaded.times ?? DEFAULT_TIMES)
   }, [loaded, dirty])
 
   const filled = phones.filter((p) => p !== "")
@@ -78,7 +99,7 @@ export function WhatsappPanel() {
   }
 
   const save = async () => {
-    await adminApi.saveWhatsapp({ phones: filled, ...on, excel, mode, billFormat })
+    await adminApi.saveWhatsapp({ phones: filled, ...on, excel, times, mode, billFormat })
     setDirty(false)
     await status.reload()
   }
@@ -262,29 +283,91 @@ export function WhatsappPanel() {
           <div className="admin-kicker mb-2">Reports</div>
           <div className="flex flex-col gap-2">
             {REPORTS.map((r) => (
-              <button
-                key={r.key}
-                type="button"
-                role="switch"
-                aria-checked={on[r.key]}
-                className="flex min-h-14 items-center gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-soft)] p-3 text-left"
-                onClick={() => {
-                  setOn({ ...on, [r.key]: !on[r.key] })
-                  setDirty(true)
-                }}
-              >
-                <span
-                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border ${
-                    on[r.key] ? "border-[#3D6FA8] bg-[#3D6FA8] text-white" : "border-[var(--border)] text-transparent"
-                  }`}
+              <div key={r.key} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-soft)]">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={on[r.key]}
+                  className="flex min-h-14 w-full items-center gap-3 p-3 text-left"
+                  onClick={() => {
+                    setOn({ ...on, [r.key]: !on[r.key] })
+                    setDirty(true)
+                  }}
                 >
-                  <CheckCircle2 size={14} />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-600">{r.label} report</span>
-                  <span className="block text-[11px] text-[var(--text-muted)]">{r.when}</span>
-                </span>
-              </button>
+                  <span
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border ${
+                      on[r.key] ? "border-[#3D6FA8] bg-[#3D6FA8] text-white" : "border-[var(--border)] text-transparent"
+                    }`}
+                  >
+                    <CheckCircle2 size={14} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-600">{r.label} report</span>
+                    <span className="block text-[11px] text-[var(--text-muted)]">{describe(r.key, times)}</span>
+                  </span>
+                </button>
+                {on[r.key] && (
+                  <div className="flex flex-wrap items-center gap-2 border-t border-[var(--border-subtle)] px-3 py-2.5">
+                    <span className="text-[11px] text-[var(--text-muted)]">
+                      {r.key === "daily" ? "Send at" : r.key === "weekly" ? "Send on" : "Send on day"}
+                    </span>
+                    {r.key === "weekly" && (
+                      <select
+                        className="admin-input h-10 w-auto min-w-0 px-3 text-[16px]"
+                        aria-label="Day of the week for the weekly report"
+                        value={times.weeklyDay}
+                        onChange={(e) => {
+                          setTimes({ ...times, weeklyDay: Number(e.target.value) })
+                          setDirty(true)
+                        }}
+                      >
+                        {WEEKDAYS.map((d, i) => (
+                          <option key={d} value={i}>
+                            {d}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    {r.key === "monthly" && (
+                      <select
+                        className="admin-input h-10 w-auto min-w-0 px-3 text-[16px]"
+                        aria-label="Day of the month for the monthly report"
+                        value={times.monthlyDay}
+                        onChange={(e) => {
+                          setTimes({ ...times, monthlyDay: Number(e.target.value) })
+                          setDirty(true)
+                        }}
+                      >
+                        {DAYS_OF_MONTH.map((d) => (
+                          <option key={d} value={d}>
+                            {ordinal(d)}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <span className="text-[11px] text-[var(--text-muted)]">{r.key === "weekly" || r.key === "monthly" ? "at" : ""}</span>
+                    <input
+                      type="time"
+                      className="admin-input h-10 w-auto min-w-0 px-3 text-[16px]"
+                      aria-label={`Time for the ${r.label.toLowerCase()} report`}
+                      value={r.key === "daily" ? times.dailyTime : r.key === "weekly" ? times.weeklyTime : times.monthlyTime}
+                      onChange={(e) => {
+                        if (!/^\d{2}:\d{2}$/.test(e.target.value)) return
+                        setTimes({
+                          ...times,
+                          ...(r.key === "daily"
+                            ? { dailyTime: e.target.value }
+                            : r.key === "weekly"
+                              ? { weeklyTime: e.target.value }
+                              : { monthlyTime: e.target.value }),
+                        })
+                        setDirty(true)
+                      }}
+                    />
+                    <span className="text-[10px] text-[var(--text-muted)]">Indian time</span>
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         </div>
@@ -313,14 +396,12 @@ export function WhatsappPanel() {
               <FileSpreadsheet size={15} /> Attach the full Excel report
             </span>
             <span className="block text-[11px] leading-snug text-[var(--text-muted)]">
-              Every branch, customer, bill, service, product, stylist, expense and payout for the period, in one file. Needs the “
-              {loaded?.templates.reportFile ?? "cave_report_file"}” template approved in WhatsApp.
+              Every branch, customer, bill, service, product, stylist, expense and payout for the period, in one file. 
             </span>
           </span>
         </button>
 
-        <div className="admin-kicker mb-2 mt-5">Try a report</div>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
           <label className="block">
             <span className="mb-1 block text-[10px] uppercase tracking-widest text-[var(--text-muted)]">From</span>
             <input
