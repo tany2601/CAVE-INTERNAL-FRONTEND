@@ -2,6 +2,7 @@ import { useState } from "react"
 import { round2, sumMoney } from "../../../lib/money"
 import {
   ArrowRight,
+  Pencil,
   Plus,
   Save,
   SlidersHorizontal,
@@ -105,6 +106,32 @@ export const ExpensesView = () => {
   const advanceEmployee = branchStaff.find((s) => s.name === employee) ?? branchStaff[0]
   const canSave =
     !!description.trim() && !!amount && Number(amount) > 0 && !!addBranch && (!isAdvance || !!advanceEmployee)
+
+  const [editing, setEditing] = useState<ApiTransaction | null>(null)
+  const [editDescription, setEditDescription] = useState("")
+  const [editAmount, setEditAmount] = useState("")
+  const [editMode, setEditMode] = useState("Cash")
+
+  const startEdit = (item: ApiTransaction) => {
+    setEditing(item)
+    setEditDescription(item.description)
+    setEditAmount(String(item.amount))
+    setEditMode(item.paymentMode === "GPAY" ? "GPay" : "Cash")
+  }
+  const editAmountValue = Number(editAmount)
+  const canSaveEdit =
+    !!editDescription.trim() && editAmountValue > 0 && Math.round(editAmountValue * 100) / 100 === editAmountValue
+
+  const saveEdit = async () => {
+    if (!editing) return
+    await adminApi.updateTransaction(editing.id, {
+      description: editDescription.trim(),
+      amount: editAmountValue,
+      paymentMode: editMode === "GPay" ? "GPAY" : "CASH",
+    })
+    setEditing(null)
+    await ledgerState.reload()
+  }
 
   const saveExpense = async () => {
     if (!addBranch) return
@@ -243,6 +270,14 @@ export const ExpensesView = () => {
                   <div className="font-display font-800 text-xl text-[#E06060]">
                     -{formatMoney(item.amount)}
                   </div>
+                  <button
+                    type="button"
+                    aria-label={`Edit ${item.description}`}
+                    className="ml-3 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text)]"
+                    onClick={() => startEdit(item)}
+                  >
+                    <Pencil size={14} />
+                  </button>
                 </article>
               )
             })}
@@ -358,6 +393,52 @@ export const ExpensesView = () => {
             }
           >
             <Save size={15} /> Save expense
+          </button>
+        </AdminModal>
+      )}
+      {editing && (
+        <AdminModal title="Edit expense" onClose={() => setEditing(null)}>
+          <div className="text-xs text-[var(--text-muted)] mb-3">
+            {editing.branch?.name}
+            {editing.employee ? ` · advance for ${editing.employee.name}` : ""}. The branch, type and employee stay as
+            recorded.
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div className="sm:col-span-2">
+              <Field label="Description / reason">
+                <input
+                  className="admin-input w-full"
+                  value={editDescription}
+                  onChange={(event) => setEditDescription(event.target.value)}
+                />
+              </Field>
+            </div>
+            <Field label="Amount">
+              <input
+                className="admin-input w-full"
+                inputMode="decimal"
+                value={editAmount}
+                onChange={(event) => setEditAmount(event.target.value.replace(/[^\d.]/g, ""))}
+              />
+            </Field>
+            <Field label="Payment mode">
+              <AdminSelect value={editMode} onChange={setEditMode} options={["Cash", "GPay"]} full />
+            </Field>
+          </div>
+          <button
+            className="admin-primary-button w-full mt-5"
+            disabled={!canSaveEdit}
+            onClick={() =>
+              actions.request({
+                title: "Save these changes?",
+                message: `This expense will become ${formatMoney(editAmountValue)} for “${editDescription.trim()}”.`,
+                confirmLabel: "Save changes",
+                action: saveEdit,
+                successMessage: "Expense updated",
+              })
+            }
+          >
+            <Save size={15} /> Save changes
           </button>
         </AdminModal>
       )}

@@ -59,6 +59,11 @@ export const createExpense = (body: {
   employeeId?: string
 }) => request<ApiExpense>("POST", "/staff/expenses", { body })
 
+export const updateExpense = (
+  id: string,
+  body: { description?: string; amount?: number; paymentMode?: ApiPaymentMode },
+) => request<ApiExpense>("PATCH", `/staff/expenses/${id}`, { body })
+
 export const getStats = (period: "TODAY" | "THIS_WEEK" | "THIS_MONTH") =>
   request<{ period: string; stylists: ApiStylist[] }>("GET", "/staff/stats", {
     query: { period },

@@ -33,7 +33,7 @@ const num = (v: number | string | null | undefined) =>
   v === null || v === undefined || v === "" ? 0 : Number(v)
 
 const commissionSummary = (s: ApiStaff) => {
-  if (s.role.name !== "STYLIST" || !s.commissionModel) return null
+  if (!s.commissionModel) return null
   if (s.commissionModel === "FLAT_PERCENTAGE")
     return `Flat ${num(s.flatCommissionPercentage)}%`
   if (s.commissionModel === "DAILY_TARGET")
@@ -277,13 +277,11 @@ function StaffModal({
     existing?.monthlySalary != null ? String(num(existing.monthlySalary)) : "",
   )
 
-  const isStylist = employeeType === "Stylist"
   const modelKey = MODEL_BY_LABEL[model] // undefined when "None"
   const editing = data.mode === "edit"
   // Phone, salary, targets and commission are all optional; once a commission model is chosen its own numbers are needed.
   const phoneValid = phone === "" || isValidPhone(phone)
   const commissionValid =
-    !isStylist ||
     !modelKey ||
     (modelKey === "FLAT_PERCENTAGE" && flat !== "" && Number(flat) <= 100) ||
     (modelKey === "DAILY_TARGET" && daily !== "") ||
@@ -304,8 +302,7 @@ function StaffModal({
       monthlySalary: optional(salary !== "" ? Number(salary) : undefined),
       phone: optional(phone.trim() !== "" ? phone.trim() : undefined),
       ...(photo ? { photoUrl: photo } : {}),
-      ...(isStylist
-        ? {
+      ...{
             dailyRevenueTarget: optional(daily !== "" ? Number(daily) : undefined),
             monthlyRevenueTarget: optional(target !== "" ? Number(target) : undefined),
             // No model: leave it out when adding, clear it (null) when editing.
@@ -323,8 +320,7 @@ function StaffModal({
                       })),
                     }
                   : {}),
-          }
-        : {}),
+      },
     })
 
   return (
@@ -400,7 +396,7 @@ function StaffModal({
             full
           />
         </Field>
-        {isStylist && (
+        {(
           <Field label="Commission model (optional)">
             <AdminSelect
               value={model}
@@ -410,7 +406,7 @@ function StaffModal({
             />
           </Field>
         )}
-        {isStylist && modelKey === "FLAT_PERCENTAGE" && (
+        {modelKey === "FLAT_PERCENTAGE" && (
           <Field label="Commission %">
             <Input
               value={flat}
@@ -420,7 +416,7 @@ function StaffModal({
             />
           </Field>
         )}
-        {isStylist && (
+        {(
           <Field label="Daily target (optional)">
             <Input
               value={daily}
@@ -430,7 +426,7 @@ function StaffModal({
             />
           </Field>
         )}
-        {isStylist && (
+        {(
           <Field label="Monthly target (optional)">
             <Input
               value={target}
@@ -449,7 +445,7 @@ function StaffModal({
           />
         </Field>
       </div>
-      {isStylist && modelKey === "MONTHLY_TARGET" && (
+      {modelKey === "MONTHLY_TARGET" && (
         <div className="mt-3 grid gap-3">
           {slabs.map((slab, index) => (
             <div key={index} className="grid sm:grid-cols-2 gap-3">

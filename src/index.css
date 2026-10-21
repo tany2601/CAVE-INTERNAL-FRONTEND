@@ -2038,3 +2038,14 @@ html.keyboard-stable, html.keyboard-stable body { overscroll-behavior: none; }
 /* Sliding rows (products, services on the billing screen): no scrollbar, the arrows do the job */
 .hscroller { scrollbar-width: none; -ms-overflow-style: none; }
 .hscroller::-webkit-scrollbar { display: none; }
+
+/* The Quick bill sheet opens over the home screen, which keeps the original look; give just the sheet the
+   readable greys the dashboards use. */
+.quick-sheet {
+  --text-secondary: #d2d2d2;
+  --text-muted: #ababab;
+}
+html[data-theme='light'] .quick-sheet {
+  --text-secondary: #2a2a2a;
+  --text-muted: #4a4a4a;
+}

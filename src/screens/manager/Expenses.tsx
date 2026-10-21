@@ -7,7 +7,7 @@ import { useBranchData } from "../../context/BranchDataContext"
 import { staffApi } from "../../lib/api"
 import { toApiMode } from "../../lib/mappers"
 import { Expense, Stylist } from "../../types"
-import { Plus, X } from "lucide-react"
+import { Pencil, Plus, X } from "lucide-react"
 import { ManagerNav } from "../../components/layout"
 
 interface Props {
@@ -18,6 +18,7 @@ interface Props {
 export default function Expenses({ onNav, navTab }: Props) {
   const { expenses, stylists, refresh } = useBranchData()
   const [showAdd, setShowAdd] = useState(false)
+  const [editing, setEditing] = useState<Expense | null>(null)
 
   const cashOut = sumMoney(expenses
     .filter((e) => e.paymentMode === "cash")
@@ -87,6 +88,14 @@ export default function Expenses({ onNav, navTab }: Props) {
                       {exp.addedBy} · {formatTime(exp.time)}
                     </div>
                   </div>
+                  <button
+                    type="button"
+                    aria-label={`Edit ${exp.description}`}
+                    className="mr-3 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--border)] text-[var(--text-secondary)] active:opacity-70"
+                    onClick={() => setEditing(exp)}
+                  >
+                    <Pencil size={14} strokeWidth={1.8} />
+                  </button>
                   <div className="text-right flex-shrink-0">
                     <div className="font-display font-800 text-base text-[#E06060]">
                       -{formatAmount(exp.amount)}
@@ -135,6 +144,23 @@ export default function Expenses({ onNav, navTab }: Props) {
         />
       )}
 
+      {editing && (
+        <AddExpenseSheet
+          stylists={stylists}
+          initial={editing}
+          onSave={async (exp) => {
+            await staffApi.updateExpense(editing.id, {
+              description: exp.description,
+              amount: exp.amount,
+              paymentMode: toApiMode(exp.paymentMode),
+            })
+            await refresh()
+            setEditing(null)
+          }}
+          onClose={() => setEditing(null)}
+        />
+      )}
+
       <ManagerNav active={navTab} onSelect={onNav} />
     </div>
   )
@@ -167,20 +193,24 @@ function SummaryPill({
 
 function AddExpenseSheet({
   stylists,
+  initial,
   onSave,
   onClose,
 }: {
   stylists: Stylist[]
+  /** Set when correcting an existing entry: the type and employee stay as recorded. */
+  initial?: Expense
   onSave: (
     e: Pick<Expense, "type" | "description" | "amount" | "paymentMode" | "employeeId">,
   ) => Promise<void>
   onClose: () => void
 }) {
-  const [type, setType] = useState<"general" | "advance">("general")
-  const [desc, setDesc] = useState("")
-  const [amount, setAmount] = useState("")
-  const [mode, setMode] = useState<"cash" | "gpay">("cash")
-  const [empId, setEmpId] = useState("")
+  const [type, setType] = useState<"general" | "advance">(initial?.type ?? "general")
+  const [desc, setDesc] = useState(initial?.description ?? "")
+  const [amount, setAmount] = useState(initial ? String(initial.amount) : "")
+  const [mode, setMode] = useState<"cash" | "gpay">(initial?.paymentMode ?? "cash")
+  const [empId, setEmpId] = useState(initial?.employeeId ?? "")
+  const editing = !!initial
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -214,7 +244,7 @@ function AddExpenseSheet({
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-subtle)] flex-shrink-0">
           <span className="font-display font-700 tracking-wider uppercase text-sm text-[var(--text)]">
-            Add Expense
+            {editing ? "Edit Expense" : "Add Expense"}
           </span>
           <button
             className="text-[var(--text-muted)] tap-target"
@@ -226,7 +256,7 @@ function AddExpenseSheet({
 
         <div className="overflow-y-auto flex-1 px-5 py-5 flex flex-col gap-5">
           {/* Type */}
-          <div>
+          {!editing && <div>
             <div className="text-[9px] tracking-widest uppercase text-[var(--text-subtle)] mb-2">
               Expense Type
             </div>
@@ -248,9 +278,9 @@ function AddExpenseSheet({
                 </button>
               ))}
             </div>
-          </div>
+          </div>}
 
-          {type === "advance" && (
+          {type === "advance" && !editing && (
             <div>
               <div className="text-[9px] tracking-widest uppercase text-[var(--text-subtle)] mb-2">
                 Employee
@@ -341,7 +371,7 @@ function AddExpenseSheet({
             disabled={!desc || !amount || saving || (type === "advance" && !empId)}
             onClick={save}
           >
-            {saving ? "Saving…" : "Save Expense"}
+            {saving ? "Saving…" : editing ? "Save changes" : "Save Expense"}
           </Button>
         </div>
       </div>

@@ -109,7 +109,7 @@ export default function Welcome({
           onClick={() => setShowSessions(false)}
         >
           <div
-            className="bg-[var(--surface)] border-t border-[var(--border)] rounded-t-2xl p-5 pb-8 max-h-[85dvh] overflow-y-auto animate-sheet-up"
+            className="quick-sheet bg-[var(--surface)] border-t border-[var(--border)] rounded-t-2xl p-5 pb-8 max-h-[85dvh] overflow-y-auto animate-sheet-up"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-start justify-between mb-5">
@@ -117,7 +117,7 @@ export default function Welcome({
                 <div className="font-display font-800 text-xl tracking-wider uppercase text-[var(--text)]">
                   Quick bill
                 </div>
-                <div className="text-xs text-[var(--text-muted)] mt-1">
+                <div className="text-sm text-[var(--text-muted)] mt-1">
                   Choose an active customer to check out.
                 </div>
               </div>
@@ -140,7 +140,7 @@ export default function Welcome({
                   <div className="font-display font-700 tracking-wider uppercase">
                     Sell products only
                   </div>
-                  <div className="text-[10px] opacity-60 mt-1">
+                  <div className="text-xs opacity-75 mt-1">
                     No services — just bill and sell products.
                   </div>
                 </div>
@@ -159,7 +159,7 @@ export default function Welcome({
                     <div className="font-display font-700 tracking-wide text-[var(--text)]">
                       {session.customerName}
                     </div>
-                    <div className="text-[10px] text-[var(--text-muted)] mt-1">
+                    <div className="text-xs text-[var(--text-muted)] mt-1">
                       {getStylist(session.stylistId) ? `with ${getStylist(session.stylistId)?.name}` : "No stylist assigned"}
                     </div>
                   </div>

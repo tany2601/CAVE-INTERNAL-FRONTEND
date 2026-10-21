@@ -182,6 +182,11 @@ export const createTransaction = (body: {
   employeeId?: string
 }) => request<unknown>("POST", "/admin/transactions", { body })
 
+export const updateTransaction = (
+  id: string,
+  body: { description?: string; amount?: number; paymentMode?: ApiPaymentMode },
+) => request<unknown>("PATCH", `/admin/transactions/${id}`, { body })
+
 // ── Admin account ────────────────────────────────────────────────────
 export const changeAdminPin = (currentPin: string, newPin: string) =>
   request<{ message: string }>("PATCH", "/admin/auth/pin", {

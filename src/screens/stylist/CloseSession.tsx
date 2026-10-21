@@ -610,15 +610,15 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
             <div className="border-t border-[var(--border-subtle)] mt-2 pt-2">
               {serviceLines.length > 0 && productTotal > 0 && (
                 <>
-                  <AmountRow label="Services" value={formatAmount(serviceTotal)} muted />
-                  <AmountRow label="Products" value={formatAmount(productTotal)} muted />
+                  <AmountRow label="Services" value={formatAmount(serviceTotal)} />
+                  <AmountRow label="Products" value={formatAmount(productTotal)} />
                 </>
               )}
               {serviceDiscountAmount > 0 && (
-                <AmountRow label="Discount on services" value={`-${formatAmount(serviceDiscountAmount)}`} muted />
+                <AmountRow label="Discount on services" value={`-${formatAmount(serviceDiscountAmount)}`} />
               )}
               {productDiscountAmount > 0 && (
-                <AmountRow label="Discount on products" value={`-${formatAmount(productDiscountAmount)}`} muted />
+                <AmountRow label="Discount on products" value={`-${formatAmount(productDiscountAmount)}`} />
               )}
               {tip > 0 && <AmountRow label={`Tip (${tipMode})`} value={formatAmount(tip)} />}
             </div>
