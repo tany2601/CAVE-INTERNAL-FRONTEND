@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import { CalendarRange, ChevronLeft, ChevronRight } from "lucide-react"
 import { formatRange, parseDayKey, toDayKey, todayKey } from "../../../lib/dates"
 
@@ -28,12 +29,15 @@ export function DateRangePicker({
   const anchor = value.from ? parseDayKey(value.from) : new Date()
   const [view, setView] = useState(new Date(anchor.getFullYear(), anchor.getMonth(), 1))
   const box = useRef<HTMLDivElement>(null)
+  const pop = useRef<HTMLDivElement>(null)
+  const [place, setPlace] = useState<{ left: number; top: number } | null>(null)
   const today = todayKey()
 
   useEffect(() => {
     if (!open) return
     const onDown = (e: PointerEvent) => {
-      if (!box.current?.contains(e.target as Node)) setOpen(false)
+      const target = e.target as Node
+      if (!box.current?.contains(target) && !pop.current?.contains(target)) setOpen(false)
     }
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false)
     document.addEventListener("pointerdown", onDown)
@@ -42,6 +46,37 @@ export function DateRangePicker({
       document.removeEventListener("pointerdown", onDown)
       document.removeEventListener("keydown", onKey)
     }
+  }, [open])
+
+  // The calendar floats above the page and is kept inside the screen: under the button when there is room,
+  // above it when there is not, and slid sideways so it never runs off either edge (phone, tablet or desktop).
+  useLayoutEffect(() => {
+    if (!open) return
+    const position = () => {
+      const trigger = box.current?.getBoundingClientRect()
+      const card = pop.current
+      if (!trigger || !card) return
+      const margin = 12
+      const width = Math.min(card.offsetWidth, window.innerWidth - margin * 2)
+      const height = card.offsetHeight
+      const left = Math.max(margin, Math.min(trigger.left, window.innerWidth - width - margin))
+      const below = trigger.bottom + 8
+      const fitsBelow = below + height + margin <= window.innerHeight
+      const above = trigger.top - 8 - height
+      const top = fitsBelow ? below : above >= margin ? above : Math.max(margin, window.innerHeight - height - margin)
+      setPlace({ left, top })
+    }
+    position()
+    window.addEventListener("resize", position)
+    window.addEventListener("scroll", position, true)
+    return () => {
+      window.removeEventListener("resize", position)
+      window.removeEventListener("scroll", position, true)
+    }
+  }, [open, view])
+
+  useEffect(() => {
+    if (!open) setPlace(null)
   }, [open])
 
   const cells = useMemo(() => {
@@ -88,11 +123,14 @@ export function DateRangePicker({
         <span className={`select-value ${value.from ? "" : "select-placeholder"}`}>{label}</span>
       </button>
 
-      {open && (
+      {open &&
+        createPortal(
         <div
+          ref={pop}
           role="dialog"
           aria-label="Choose a date range"
-          className="absolute left-0 z-40 mt-2 w-[min(20rem,calc(100vw-2rem))] rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[0_16px_40px_rgba(0,0,0,0.35)] animate-fade-in"
+          style={{ left: place?.left ?? 0, top: place?.top ?? 0, visibility: place ? "visible" : "hidden" }}
+          className="fixed z-[80] w-[min(20rem,calc(100vw-1.5rem))] max-h-[calc(100dvh-1.5rem)] overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[0_16px_40px_rgba(0,0,0,0.35)] animate-fade-in"
         >
           <div className="flex items-center justify-between">
             <button
@@ -160,8 +198,9 @@ export function DateRangePicker({
               </button>
             )}
           </div>
-        </div>
-      )}
+        </div>,
+          document.body,
+        )}
     </div>
   )
 }

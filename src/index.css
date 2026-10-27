@@ -951,7 +951,8 @@ input, textarea, [contenteditable] { -webkit-user-select: text; user-select: tex
     flex-direction: column;
   }
 
-  .branch-detail-toolbar .admin-segment {
+  .branch-detail-toolbar .admin-segment,
+  .branch-detail-toolbar > div {
     width: 100%;
   }
 

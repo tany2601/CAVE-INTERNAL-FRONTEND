@@ -6,6 +6,7 @@ import { storageKeys, useAuth } from "../context/AuthContext"
 import { useBranchData } from "../context/BranchDataContext"
 import { ErrorNotice } from "../components/ui"
 import { BooksPrompter } from "../components/BooksPrompter"
+import { UpdateManager } from "../components/UpdateManager"
 import type { CloseSessionPayload } from "../types/api"
 
 // Auth
@@ -160,6 +161,7 @@ export default function AppRouter() {
     <>
       <AppScreens onScreen={setScreenName} />
       <BooksPrompter screen={screenName} />
+      <UpdateManager screen={screenName} />
     </>
   )
 }

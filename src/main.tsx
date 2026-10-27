@@ -30,6 +30,26 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
 }
 
 
+// A phone that kept an old page open can ask for a file that a newer deploy replaced. Reload once to pick up
+// the new version instead of showing a blank screen (guarded so it can never loop).
+window.addEventListener('vite:preloadError', () => {
+  try {
+    if (sessionStorage.getItem('cave-preload-reload') === '1') return
+    sessionStorage.setItem('cave-preload-reload', '1')
+  } catch {
+    // ignore
+  }
+  window.location.reload()
+})
+
+window.setTimeout(() => {
+  try {
+    sessionStorage.removeItem('cave-preload-reload')
+  } catch {
+    // ignore
+  }
+}, 10000)
+
 // Launch splash (markup lives in index.html): shown for 3.5 s when the app is opened fresh, skipped
 // when the page is just reloaded inside a running session.
 const splash = document.getElementById('splash')

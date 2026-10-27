@@ -1,6 +1,8 @@
 /* CAVE service worker: makes the app installable and start instantly.
  * It caches the app shell only. API calls are never cached, so data is always live. */
-const CACHE = "cave-shell-v2"
+// __BUILD_ID__ is replaced at build time, so each deploy ships a different worker file: browsers notice it,
+// install it straight away (skipWaiting) and the activate step below removes every older cache.
+const CACHE = "cave-shell-__BUILD_ID__"
 const SHELL = ["/", "/manifest.webmanifest", "/favicon.svg", "/icons/icon-192.png"]
 
 self.addEventListener("install", (event) => {
@@ -23,20 +25,28 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(req.url)
   if (url.origin !== self.location.origin) return // photos, fonts: leave to the network/browser cache
   if (url.pathname.startsWith("/api/")) return // never cache data
+  if (url.pathname === "/version.json" || url.pathname === "/sw.js") return // always straight from the network
 
-  // Page loads: show the cached shell straight away (no blank screen while the network wakes up)
-  // and refresh it in the background for next time. Offline, the cached shell is all there is.
+  // Page loads: the network first, so an opened app is always the latest deploy. If the network is slow or
+  // down (4 s), the cached shell opens instead, so the app still starts offline or on a weak signal.
   if (req.mode === "navigate") {
     event.respondWith(
-      caches.match("/").then((hit) => {
-        const network = fetch(req)
+      new Promise((resolve) => {
+        const fallback = () => caches.match("/").then((hit) => resolve(hit || Response.error()))
+        const timer = setTimeout(fallback, 4000)
+        fetch(req)
           .then((res) => {
-            const copy = res.clone()
-            caches.open(CACHE).then((c) => c.put("/", copy))
-            return res
+            clearTimeout(timer)
+            if (res.ok) {
+              const copy = res.clone()
+              caches.open(CACHE).then((c) => c.put("/", copy))
+            }
+            resolve(res)
           })
-          .catch(() => hit)
-        return hit || network
+          .catch(() => {
+            clearTimeout(timer)
+            fallback()
+          })
       }),
     )
     return

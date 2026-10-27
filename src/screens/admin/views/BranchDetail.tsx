@@ -1,3 +1,4 @@
+import { useState } from "react"
 import {
   ArrowLeft,
   BadgeIndianRupee,
@@ -6,7 +7,8 @@ import { adminApi } from "../../../lib/api"
 import { useAsyncData } from "../../../hooks/useAsyncData"
 import type { BranchSummaryReport } from "../../../types/api"
 import { formatMoney } from "../adminTypes"
-import { AdminCard, AsyncNotice, PeriodTabs, DataTable } from "../components"
+import { AdminCard, AsyncNotice, DateRangePicker, PeriodTabs, DataTable } from "../components"
+import type { DateRange } from "../components"
 import type { Period, BranchTab } from "../types"
 import { PERIOD_TO_REPORT } from "../types"
 
@@ -26,23 +28,28 @@ export function BranchDetail({
   onBack: () => void
 }) {
   const reportPeriod = PERIOD_TO_REPORT[period]
+  const [range, setRange] = useState<DateRange>({})
+  const custom = period === "Custom"
+  const rangeReady = !custom || (!!range.from && !!range.to)
+  // Custom dates ride along with every request; other periods send nothing extra.
+  const dates = custom ? { from: range.from, to: range.to } : {}
   const summary = useAsyncData(
-    () => adminApi.getBranchSummary(branch.id, reportPeriod),
-    [branch.id, reportPeriod],
+    () => (rangeReady ? adminApi.getBranchSummary(branch.id, reportPeriod, dates) : Promise.resolve(undefined)),
+    [branch.id, reportPeriod, range.from, range.to],
   )
   const sessionsState = useAsyncData(
     () =>
-      tab === "sessions"
-        ? adminApi.getSessionsReport({ branchId: branch.id, period: reportPeriod, limit: 50 })
+      tab === "sessions" && rangeReady
+        ? adminApi.getSessionsReport({ branchId: branch.id, period: reportPeriod, ...dates, limit: 50 })
         : Promise.resolve(undefined),
-    [branch.id, reportPeriod, tab],
+    [branch.id, reportPeriod, tab, range.from, range.to],
   )
   const staffState = useAsyncData(
     () =>
-      tab === "staff"
-        ? adminApi.getEmployeesReport({ branchId: branch.id, period: reportPeriod })
+      tab === "staff" && rangeReady
+        ? adminApi.getEmployeesReport({ branchId: branch.id, period: reportPeriod, ...dates })
         : Promise.resolve(undefined),
-    [branch.id, reportPeriod, tab],
+    [branch.id, reportPeriod, tab, range.from, range.to],
   )
   const sessions = sessionsState.data?.data ?? []
   const branchStaff = staffState.data ?? []
@@ -96,12 +103,20 @@ export function BranchDetail({
               </button>
             ))}
           </div>
-          <PeriodTabs
-            value={period}
-            onChange={onPeriod}
-            options={["Today", "This Week", "This Month"]}
-          />
+          <div className="flex flex-wrap items-center gap-3">
+            <PeriodTabs
+              value={period}
+              onChange={onPeriod}
+              options={["Today", "This Week", "This Month", "Custom"]}
+            />
+            {custom && <DateRangePicker value={range} onChange={setRange} autoOpen={!range.from} />}
+          </div>
         </div>
+        {custom && !rangeReady && (
+          <div className="mt-4 text-xs text-[var(--text-muted)]">
+            Choose a start and end date to see this branch for that range.
+          </div>
+        )}
 
         <AsyncNotice
           loading={summary.loading && !summary.data}

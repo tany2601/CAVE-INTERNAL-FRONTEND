@@ -220,14 +220,20 @@ export const getOverview = (
 ) =>
   request<OverviewReport>("GET", "/admin/reports/overview", { query: reportQuery(query) })
 
-export const getBranchSummary = (branchId: string, period: ReportPeriod) =>
+export const getBranchSummary = (
+  branchId: string,
+  period: ReportPeriod,
+  range: { from?: string; to?: string } = {},
+) =>
   request<BranchSummaryReport>("GET", `/admin/reports/branches/${branchId}/summary`, {
-    query: { period },
+    query: { period, ...range },
   })
 
 export const getSessionsReport = (query: {
   branchId?: string
   period?: ReportPeriod
+  from?: string
+  to?: string
   page?: number
   limit?: number
 }) => request<SessionsReport>("GET", "/admin/reports/sessions", { query })
@@ -242,7 +248,7 @@ export const getCustomersReport = (query: {
 export const getRetentionReport = (query: { branchId?: string } = {}) =>
   request<RetentionReport>("GET", "/admin/reports/retention", { query })
 
-export const getEmployeesReport = (query: { branchId?: string; period?: ReportPeriod }) =>
+export const getEmployeesReport = (query: { branchId?: string; period?: ReportPeriod; from?: string; to?: string }) =>
   request<{ data: EmployeeRow[] }>("GET", "/admin/reports/employees", { query }).then(
     (r) => r.data,
   )
