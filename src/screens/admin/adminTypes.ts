@@ -13,6 +13,7 @@ export type AdminSection =
   | "pricing"
   | "products"
   | "discounts"
+  | "gst"
   | "branch-pulse"
 
 export { formatAmount as formatMoney } from "../../lib/format"

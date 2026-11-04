@@ -112,6 +112,7 @@ const buildBillPayload = (
     d.amount > 0
       ? { type: d.mode === "percent" ? ("PERCENTAGE" as const) : ("FIXED" as const), value: d.value }
       : { type: "NONE" as const, value: 0 }
+  payload.expectedTotal = data.total
   payload.serviceDiscount = part(data.serviceDiscount)
   payload.productDiscount = part(data.productDiscount)
   return payload
@@ -599,7 +600,7 @@ function AppScreens({ onScreen }: { onScreen: (screen: string) => void }) {
           setClosingSession(mapSession(closed))
           void refresh()
           nav("session-success" as AppScreen)
-          return { id: closed.id }
+          return { id: closed.id, session: mapSession(closed) }
         }}
         onCancel={() => {
           if (productOnly) {

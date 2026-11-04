@@ -11,6 +11,7 @@ import {
   Moon,
   Package,
   BadgePercent,
+  Landmark,
   RefreshCw,
   ReceiptText,
   Settings,
@@ -51,6 +52,7 @@ import {
   PricingView,
   ProductsView,
   DiscountsView,
+  GstView,
 } from "./views"
 
 interface Props {
@@ -88,6 +90,7 @@ const navGroups: AdminNavGroup[] = [
       { id: "pricing" as const, label: "Menu pricing", icon: Tags },
       { id: "products" as const, label: "Products", icon: Package },
       { id: "discounts" as const, label: "Discounts", icon: BadgePercent },
+      { id: "gst" as const, label: "GST", icon: Landmark },
     ],
   },
   {
@@ -359,6 +362,7 @@ export default function AdminDashboard({ onLogout, theme, onThemeToggle }: Props
             {section === "pricing" && <PricingView />}
             {section === "products" && <ProductsView />}
             {section === "discounts" && <DiscountsView />}
+            {section === "gst" && <GstView />}
           </>
         )}
       </main>

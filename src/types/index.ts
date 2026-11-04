@@ -1,3 +1,4 @@
+import type { ApiSessionGst } from './api';
 export type Role = 'stylist' | 'manager';
 
 export type Screen =
@@ -81,6 +82,10 @@ export interface Session {
   /** The discount on the services and on the products, kept apart (billed sessions; undefined on older bills). */
   serviceDiscount?: { mode: 'percent' | 'amount'; value: number; amount: number };
   productDiscount?: { mode: 'percent' | 'amount'; value: number; amount: number };
+  /** GST tax invoice details (undefined on bills from before GST). */
+  invoiceNumber?: string;
+  gstin?: string;
+  gst?: ApiSessionGst;
   isEdited?: boolean;
   /** This is the customer's free-haircut visit (every 6th): their haircut bills at ₹0. */
   freeVisit?: boolean;

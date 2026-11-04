@@ -1,3 +1,4 @@
+import type { GstConfig } from "../gst"
 import { request, requestBlob } from "./http"
 import type {
   ApiProduct,
@@ -473,6 +474,10 @@ export interface BranchDiscountRow extends BranchDiscountConfig {
   branchName: string
   isActive: boolean
 }
+
+export const getGst = () => request<GstConfig>("GET", "/admin/gst")
+
+export const saveGst = (body: GstConfig) => request<GstConfig>("PUT", "/admin/gst", { body })
 
 export const listDiscounts = () =>
   request<{ data: BranchDiscountRow[] }>("GET", "/admin/discounts").then((r) => r.data)

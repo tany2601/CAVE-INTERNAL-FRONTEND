@@ -1,3 +1,4 @@
+import type { GstConfig } from "../lib/gst"
 import {
   createContext,
   useCallback,
@@ -29,6 +30,11 @@ interface BranchData {
   ready: boolean
   error: string | null
   branchName: string
+  /** One line (street, city, state) printed on the tax invoice. */
+  branchAddress: string
+  branchPhone: string
+  /** GSTIN, rates and whether prices include GST; null while GST is off. */
+  gst: GstConfig | null
   /** Branch name without the leading "CAVE", e.g. "Karkala". */
   branchShort: string
   stylists: Stylist[]
@@ -65,6 +71,9 @@ const EMPTY: Omit<
   "getStylist" | "refresh" | "addActiveSession" | "ready" | "error" | "branchShort"
 > = {
   branchName: "",
+  branchAddress: "",
+  branchPhone: "",
+  gst: null,
   stylists: [],
   services: [],
   products: [],
@@ -106,6 +115,12 @@ export function BranchDataProvider({ children }: { children: ReactNode }) {
       if (catalogue) catalogueAt.current = Date.now()
       setData((prev) => ({
         branchName: today.branch.name,
+        branchAddress: [today.branch.address, today.branch.city, today.branch.state]
+          .map((x) => x?.trim())
+          .filter(Boolean)
+          .join(", "),
+        branchPhone: today.branch.phone?.trim() ?? "",
+        gst: today.gst?.enabled ? today.gst : null,
         stylists: today.stylists.map(mapStylist),
         services: catalogue ? sortByCategory(catalogue[0]).map(mapService) : prev.services,
         products: catalogue ? catalogue[1] : prev.products,

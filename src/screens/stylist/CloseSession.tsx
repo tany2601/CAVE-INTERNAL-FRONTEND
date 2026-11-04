@@ -2,11 +2,12 @@ import { useRef, useState } from "react"
 import { Session, Service } from "../../types"
 import { Button, SectionLabel, AmountRow, Select, ServiceTile, PhoneInput, HScroller } from "../../components/ui"
 import { isValidPhone, sanitizePhone } from "../../lib/phone"
-import { billNo, billText, whatsappLink } from "../../lib/billText"
+import { billNo, billText, invoiceOf, whatsappLink } from "../../lib/billText"
+import { billGst, type GstConfig } from "../../lib/gst"
 import { formatAmount } from "../../lib/format"
 import { round2, sumMoney } from "../../lib/money"
 import { freeHaircutIndex } from "../../lib/loyalty"
-import { discountOn, groupLines, parseValue, withQty, type DiscountMode } from "../../lib/billing"
+import { discountOn, groupLines, gstRows, parseValue, withQty, type DiscountMode } from "../../lib/billing"
 import type { BranchDiscountConfig, DiscountSetting } from "../../types/api"
 import { useBranchData } from "../../context/BranchDataContext"
 import { X, Plus, Minus, Check } from "lucide-react"
@@ -26,7 +27,9 @@ interface Props {
     productDiscount: { mode: DiscountMode; value: number; amount: number }
     /** 10-digit WhatsApp number typed at billing, when the customer had none saved. */
     whatsappTo?: string
-  }) => Promise<{ id: string } | void> | { id: string } | void
+    /** The total on screen; the server refuses the bill if it works out a different one. */
+    total: number
+  }) => Promise<{ id: string; session?: Session } | void> | { id: string; session?: Session } | void
   onCancel: () => void
   /** Sell products only: no services, and no stylist or customer to bill. */
   productOnly?: boolean
@@ -105,7 +108,7 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
     (session.products ?? []).map((p) => ({ ...p })),
   )
   const stylist = getStylist(session.stylistId)
-  const { whatsapp: waSettings, branchName, discount: branchDiscount } = useBranchData()
+  const { whatsapp: waSettings, branchName, branchAddress, branchPhone, gst: gstConfig, discount: branchDiscount } = useBranchData()
   const [serviceDiscountField, setServiceDiscountField] = useState<DiscountField>(
     () => startingDiscounts(session, branchDiscount, session.status === "closed").services,
   )
@@ -168,7 +171,18 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
   const serviceDiscountAmount = discountOn(serviceDiscountField.mode, serviceDiscountValue, serviceTotal)
   const productDiscountAmount = discountOn(productDiscountField.mode, productDiscountValue, productTotal)
   const discount = round2(serviceDiscountAmount + productDiscountAmount)
-  const total = Math.max(0, round2(subtotal - discount + tip))
+  // GST: worked from the services and the products after their own discounts; the tip carries none. A new bill
+  // uses today's GST settings; a bill being corrected keeps the terms it was issued under (and a bill from before
+  // GST stays without).
+  const servicesNet = round2(serviceTotal - serviceDiscountAmount)
+  const productsNet = round2(productTotal - productDiscountAmount)
+  const gstTerms: Pick<GstConfig, "services" | "products"> | null = editing
+    ? session.gst
+      ? { services: session.gst.services, products: session.gst.products }
+      : null
+    : gstConfig
+  const gst = gstTerms ? billGst(gstTerms, servicesNet, productsNet) : null
+  const total = Math.max(0, round2((gst ? gst.payable : servicesNet + productsNet) + tip))
   // What is sent for each part: a percentage as typed (at most 100), or the rupees actually taken off.
   const serviceDiscount = {
     mode: serviceDiscountField.mode,
@@ -620,6 +634,10 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
               {productDiscountAmount > 0 && (
                 <AmountRow label="Discount on products" value={`-${formatAmount(productDiscountAmount)}`} />
               )}
+              {gst &&
+                gstRows(gst, { services: gstConfig?.servicesCode, products: gstConfig?.productsCode }).map((row) => (
+                  <AmountRow key={row.label} label={row.label} value={formatAmount(row.amount)} />
+                ))}
               {tip > 0 && <AmountRow label={`Tip (${tipMode})`} value={formatAmount(tip)} />}
             </div>
             <div className="border-t border-[var(--border-subtle)] mt-2 pt-3">
@@ -688,6 +706,7 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
                 serviceDiscount,
                 productDiscount,
                 whatsappTo: !session.customerPhone && isValidPhone(whatsapp) ? whatsapp : undefined,
+                total,
               })
               if (chatWindow) {
                 const link = whatsappLink(
@@ -699,9 +718,10 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
                     products,
                     discountAmount: discount,
                     tip,
-                    total,
+                    total: closed?.session?.total ?? total,
                     paymentMode,
                     billNo: billNo(closed?.id ?? session.id),
+                    invoice: invoiceOf(closed?.session, gstConfig, branchAddress, branchPhone),
                   }),
                 )
                 if (link) chatWindow.location.href = link

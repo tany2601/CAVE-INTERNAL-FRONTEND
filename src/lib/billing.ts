@@ -1,3 +1,4 @@
+import { halfRate } from "./gst"
 import { round2 } from "./money"
 
 export type DiscountMode = "percent" | "amount"
@@ -34,3 +35,34 @@ export function groupLines<T extends { name: string; price: number }>(
 }
 
 export const withQty = (name: string, qty: number) => (qty > 1 ? `${name} ×${qty}` : name)
+
+/** One GST side as it is printed: its taxable value and CGST / SGST. */
+export interface GstRowPart {
+  rate: number
+  inclusive: boolean
+  taxable: number
+  cgst: number
+  sgst: number
+}
+
+/** The tax lines of a bill, in the order they are printed: for services, then products. */
+export function gstRows(
+  gst: { services: GstRowPart; products: GstRowPart },
+  codes: { services?: string; products?: string } = {},
+): { label: string; amount: number; tax: boolean }[] {
+  const rows: { label: string; amount: number; tax: boolean }[] = []
+  for (const [key, name] of [
+    ["services", "Services"],
+    ["products", "Products"],
+  ] as const) {
+    const part = gst[key]
+    if (part.taxable <= 0 && part.cgst <= 0) continue
+    const half = halfRate(part.rate)
+    const note = part.inclusive ? " (incl.)" : ""
+    const code = codes[key] ? ` (${codes[key]})` : ""
+    rows.push({ label: `${name} taxable value${code}`, amount: part.taxable, tax: false })
+    rows.push({ label: `CGST @ ${half}%${note}`, amount: part.cgst, tax: true })
+    rows.push({ label: `SGST @ ${half}%${note}`, amount: part.sgst, tax: true })
+  }
+  return rows
+}

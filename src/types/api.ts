@@ -1,3 +1,4 @@
+import type { GstConfig } from "../lib/gst"
 // Shapes returned by the CAVE backend (see BACKEND/src/**).
 
 export type ApiRole = "ADMIN" | "MANAGER" | "STYLIST"
@@ -43,6 +44,10 @@ export interface ApiSession {
   productDiscountType?: ApiDiscountType
   productDiscountValue?: number
   productDiscountAmount?: number
+  /** Set on a GST tax invoice. Bills from before GST was switched on have none. */
+  invoiceNumber?: string | null
+  gstin?: string | null
+  gst?: ApiSessionGst | null
   isEdited?: boolean
   /** The customer's free-haircut visit (billed), or would be (still open). */
   isFreeVisit?: boolean
@@ -137,8 +142,36 @@ export interface ApiExpense {
   createdAt: string
 }
 
+/** One side (services or products) of the GST on a bill. */
+export interface ApiGstPart {
+  rate: number
+  inclusive: boolean
+  taxable: number
+  cgst: number
+  sgst: number
+}
+
+/** The GST on a tax invoice, as saved with the bill. */
+export interface ApiSessionGst {
+  services: ApiGstPart
+  products: ApiGstPart
+  taxable: number
+  cgst: number
+  sgst: number
+  tax: number
+}
+
 export interface TodayResponse {
-  branch: { id: string; name: string; code: string }
+  branch: {
+    id: string
+    name: string
+    code: string
+    /** Printed on the tax invoice. */
+    address?: string | null
+    city?: string | null
+    state?: string | null
+    phone?: string | null
+  }
   stylists: ApiStylist[]
   activeSessions: ApiSession[]
   closedSessions: ApiSession[]
@@ -149,6 +182,8 @@ export interface TodayResponse {
   whatsapp?: { mode: "off" | "api" | "manual"; billFormat: "text" | "image" }
   /** The discount the admin set for this branch (Admin → Discounts). */
   discount?: BranchDiscountConfig
+  /** GSTIN, rates and whether prices include GST (Admin → Settings). */
+  gst?: GstConfig | null
 }
 
 /** One discount: a percentage or an amount in rupees. */
@@ -182,6 +217,8 @@ export interface CloseSessionPayload {
   serviceDiscount?: { type: ApiDiscountType; value: number }
   productDiscount?: { type: ApiDiscountType; value: number }
   tipAmount?: number
+  /** The total the screen showed; the server refuses the bill if it works out a different one. */
+  expectedTotal?: number
   paymentMode: ApiPaymentMode
   /** Customer's WhatsApp number to send the bill to when none was saved at check-in. */
   whatsappTo?: string

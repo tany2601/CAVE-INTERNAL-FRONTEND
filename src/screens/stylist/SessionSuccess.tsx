@@ -4,7 +4,7 @@ import { Session } from "../../types"
 import { formatAmount } from "../../lib/format"
 import { useBranchData } from "../../context/BranchDataContext"
 import { staffApi } from "../../lib/api"
-import { billNo, billText, whatsappLink } from "../../lib/billText"
+import { billNo, billText, invoiceOf, whatsappLink } from "../../lib/billText"
 import { isValidPhone, sanitizePhone } from "../../lib/phone"
 import { groupLines, withQty } from "../../lib/billing"
 import { CheckCircle, Download, MessageCircle, Share2 } from "lucide-react"
@@ -43,7 +43,9 @@ export default function SessionSuccess({
           label="Services"
           value={session.services ? groupLines(session.services).map((l) => withQty(l.name, l.qty)).join(", ") : "—"}
         />
+        {session.invoiceNumber && <Row label="Invoice no." value={session.invoiceNumber} />}
         <div className="border-t border-[var(--border-subtle)] pt-3">
+          {session.gst && <Row label="GST in this bill" value={formatAmount(session.gst.tax)} />}
           <Row label="Total" value={formatAmount(total)} bold />
           <Row
             label="Payment"
@@ -103,7 +105,7 @@ function WhatsappBill({
   total: number
   paymentMode: "cash" | "gpay"
 }) {
-  const { whatsapp, branchName } = useBranchData()
+  const { whatsapp, branchName, branchAddress, branchPhone, gst: gstConfig } = useBranchData()
   const saved = sanitizePhone(session.customerPhone ?? "")
   const [typed, setTyped] = useState("")
   const number = isValidPhone(saved) ? saved : typed
@@ -142,6 +144,7 @@ function WhatsappBill({
     total,
     paymentMode,
     billNo: billNo(session.id),
+    invoice: invoiceOf(session, gstConfig, branchAddress, branchPhone),
   })
   const link = whatsappLink(number, text)
 

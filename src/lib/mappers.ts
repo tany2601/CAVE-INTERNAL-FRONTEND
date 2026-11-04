@@ -65,6 +65,9 @@ export const mapSession = (s: ApiSession): Session => ({
   discountValue: s.discountValue || undefined,
   serviceDiscount: part(s.serviceDiscountType, s.serviceDiscountValue, s.serviceDiscountAmount),
   productDiscount: part(s.productDiscountType, s.productDiscountValue, s.productDiscountAmount),
+  invoiceNumber: s.invoiceNumber ?? undefined,
+  gstin: s.gstin ?? undefined,
+  gst: s.invoiceNumber && s.gst ? s.gst : undefined,
   isEdited: s.isEdited,
   freeVisit: s.isFreeVisit || undefined,
 })
