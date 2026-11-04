@@ -1,7 +1,7 @@
 import { EmptyNote } from "../../components/ui"
 import { useState } from "react"
 import { Badge, Dialog } from "../../components/ui"
-import { formatTime, formatDuration, formatAmount } from "../../lib/format"
+import { formatDateTime, formatDuration, formatAmount } from "../../lib/format"
 import { useBranchData } from "../../context/BranchDataContext"
 import { staffApi } from "../../lib/api"
 import { Session } from "../../types"
@@ -96,6 +96,9 @@ export default function Sessions({
                         <div className="text-[10px] text-[var(--text-muted)] mt-0.5">
                           {stylist ? `with ${stylist.name}` : "No stylist assigned"}
                         </div>
+                        <div className="text-[10px] text-[var(--text-muted)]">
+                          Started {formatDateTime(session.startTime)}
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-1 bg-[var(--elevated)] border border-[var(--border)] px-2 py-1 rounded-full">
@@ -149,7 +152,13 @@ export default function Sessions({
                           </div>
                         )}
                         <div className="text-[10px] text-[var(--text-muted)] mt-0.5">
-                          {stylist ? `with ${stylist.name}` : "No stylist assigned"} · {session.closedAt ? formatTime(session.closedAt) : ""}
+                          {stylist ? `with ${stylist.name}` : "No stylist assigned"}
+                        </div>
+                        <div className="text-[10px] text-[var(--text-muted)]">
+                          Started {formatDateTime(session.startTime)}
+                        </div>
+                        <div className="text-[10px] text-[var(--text-muted)]">
+                          Bill generated {session.closedAt ? formatDateTime(session.closedAt) : "—"}
                         </div>
                       </div>
                     </div>

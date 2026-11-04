@@ -110,6 +110,10 @@ export const editSession = (sessionId: string, body: CloseSessionPayload) =>
 export const deleteSession = (sessionId: string) =>
   request<{ message: string }>("DELETE", `/staff/sessions/${sessionId}`)
 
+/** Throw away a bill that was just started and never closed (nothing is kept). */
+export const discardSession = (sessionId: string) =>
+  request<{ message: string }>("POST", `/staff/sessions/${sessionId}/discard`)
+
 /** Where this bill's WhatsApp message stands. */
 export const getBillWhatsapp = (sessionId: string) =>
   request<{ status: "none" | "PENDING" | "SENT" | "FAILED" }>("GET", `/staff/sessions/${sessionId}/whatsapp`).then((r) => r.status)

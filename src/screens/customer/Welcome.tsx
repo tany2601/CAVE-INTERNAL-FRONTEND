@@ -19,6 +19,8 @@ interface Props {
   onQuickBill: (session: Session) => void
   /** Sell products without any service (opens a products-only bill). */
   onProductSale: () => void
+  /** Bill a new customer in a few steps: details, services, products, bill. */
+  onQuickServices: () => void
   activeSessions: Session[]
   role: "stylist" | "manager"
 }
@@ -28,6 +30,7 @@ export default function Welcome({
   onMenu,
   onQuickBill,
   onProductSale,
+  onQuickServices,
   activeSessions,
   role,
 }: Props) {
@@ -118,7 +121,7 @@ export default function Welcome({
                   Quick bill
                 </div>
                 <div className="text-sm text-[var(--text-muted)] mt-1">
-                  Choose an active customer to check out.
+                  Start a new bill, or choose a customer who is already here.
                 </div>
               </div>
               <button
@@ -131,6 +134,19 @@ export default function Welcome({
             <div className="flex flex-col gap-2">
               <button
                 className="w-full flex items-center justify-between p-4 bg-[var(--text)] text-[var(--bg)] text-left card-press"
+                onClick={() => {
+                  setShowSessions(false)
+                  onQuickServices()
+                }}
+              >
+                <div>
+                  <div className="font-display font-700 tracking-wider uppercase">New customer bill</div>
+                  <div className="text-xs opacity-75 mt-1">For a customer in a hurry: name, services, products, bill.</div>
+                </div>
+                <ArrowRight size={18} />
+              </button>
+              <button
+                className="w-full flex items-center justify-between p-4 bg-[var(--elevated)] border border-[var(--border)] text-[var(--text)] text-left card-press"
                 onClick={() => {
                   setShowSessions(false)
                   onProductSale()

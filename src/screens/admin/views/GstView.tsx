@@ -3,6 +3,7 @@ import { Receipt, Save } from "lucide-react"
 import { adminApi } from "../../../lib/api"
 import { useAsyncData } from "../../../hooks/useAsyncData"
 import { billGst, halfRate, isValidGstin, type GstConfig } from "../../../lib/gst"
+import { categoryOf, CATEGORY_ORDER } from "../../../lib/menuOrder"
 import { formatMoney } from "../adminTypes"
 import { AdminPage, AsyncNotice, Field, PageHeading } from "../components"
 import { useAdminActions } from "../hooks/useAdminActions"
@@ -14,7 +15,8 @@ interface Draft {
   gstin: string
   legalName: string
   servicesRate: string
-  servicesInclusive: boolean
+  /** The services (ids) whose menu price already includes the GST; all others have it added on top. */
+  inclusiveServiceIds: string[]
   productsRate: string
   productsInclusive: boolean
   servicesCode: string
@@ -26,7 +28,7 @@ const toDraft = (c: GstConfig): Draft => ({
   gstin: c.gstin,
   legalName: c.legalName,
   servicesRate: String(c.services.rate),
-  servicesInclusive: c.services.inclusive,
+  inclusiveServiceIds: c.inclusiveServiceIds,
   productsRate: String(c.products.rate),
   productsInclusive: c.products.inclusive,
   servicesCode: c.servicesCode,
@@ -38,7 +40,9 @@ const toConfig = (d: Draft): GstConfig => ({
   enabled: d.enabled,
   gstin: d.gstin.trim().toUpperCase(),
   legalName: d.legalName.trim(),
-  services: { rate: num(d.servicesRate), inclusive: d.servicesInclusive },
+  // A service that is not on the menu (a custom one) always has the GST added on top.
+  services: { rate: num(d.servicesRate), inclusive: false },
+  inclusiveServiceIds: [...d.inclusiveServiceIds].sort(),
   products: { rate: num(d.productsRate), inclusive: d.productsInclusive },
   servicesCode: d.servicesCode.trim(),
   productsCode: d.productsCode.trim(),
@@ -55,16 +59,19 @@ const rateText = (text: string) => {
 /** Admin → GST: the GSTIN printed on every bill, the rates, and whether menu prices include the tax. */
 export const GstView = () => {
   const actions = useAdminActions()
-  const { data, loading, error, reload } = useAsyncData(() => adminApi.getGst())
+  const { data, loading, error, reload } = useAsyncData(async () => {
+    const [config, services] = await Promise.all([adminApi.getGst(), adminApi.listServices()])
+    return { config, services: services.filter((s) => s.isActive) }
+  })
   const [draft, setDraft] = useState<Draft | null>(null)
 
   // Fresh data from the server never overwrites what is being typed.
   useEffect(() => {
     if (!data) return
-    setDraft((current) => (current && !same(current, toDraft(data)) ? current : toDraft(data)))
+    setDraft((current) => (current && !same(current, toDraft(data.config)) ? current : toDraft(data.config)))
   }, [data])
 
-  const dirty = !!data && !!draft && !same(draft, toDraft(data))
+  const dirty = !!data && !!draft && !same(draft, toDraft(data.config))
   useUnsavedChanges(dirty)
 
   const set = (patch: Partial<Draft>) => setDraft((d) => (d ? { ...d, ...patch } : d))
@@ -74,7 +81,21 @@ export const GstView = () => {
   const valid = !!cfg && gstinOk && codeOk(cfg.servicesCode) && codeOk(cfg.productsCode)
 
   // A worked example from the figures on screen, so the effect of each choice is visible before saving.
-  const example = cfg ? billGst(cfg, 1000, 1000) : null
+  const example = cfg ? billGst(cfg, { servicesInclusive: 300, servicesExclusive: 1200, products: 599 }) : null
+  const toggleService = (id: string) =>
+    setDraft((d) =>
+      d ? { ...d, inclusiveServiceIds: d.inclusiveServiceIds.includes(id) ? d.inclusiveServiceIds.filter((x) => x !== id) : [...d.inclusiveServiceIds, id] } : d,
+    )
+  // The menu grouped like the billing screen: Hair, Beard, Skin, Combo, then the rest.
+  const groups = new Map<string, { id: string; name: string }[]>()
+  for (const svc of data?.services ?? []) {
+    const key = categoryOf(svc.name, svc.category)
+    groups.set(key, [...(groups.get(key) ?? []), { id: svc.id, name: svc.name }])
+  }
+  const orderedGroups = [...groups.entries()].sort(([a], [b]) => {
+    const rank = (k: string) => (CATEGORY_ORDER.includes(k) ? CATEGORY_ORDER.indexOf(k) : CATEGORY_ORDER.length)
+    return rank(a) - rank(b) || a.localeCompare(b)
+  })
 
   const save = async () => {
     if (!cfg) return
@@ -146,7 +167,7 @@ export const GstView = () => {
 
               {(["services", "products"] as const).map((side) => {
                 const rate = side === "services" ? draft.servicesRate : draft.productsRate
-                const inclusive = side === "services" ? draft.servicesInclusive : draft.productsInclusive
+                const inclusive = draft.productsInclusive
                 const code = side === "services" ? draft.servicesCode : draft.productsCode
                 return (
                   <div key={side} className="rounded-xl border border-[var(--border-subtle)] p-4">
@@ -163,22 +184,30 @@ export const GstView = () => {
                     <div className="mt-1 text-[11px] text-[var(--text-muted)]">
                       CGST {halfRate(num(rate))}% + SGST {halfRate(num(rate))}%
                     </div>
-                    <div className="mt-3 text-xs text-[var(--text-secondary)]">Menu prices</div>
-                    <div className="mt-1 flex" role="group" aria-label={`${side} prices and GST`}>
-                      {([false, true] as const).map((inc) => (
-                        <button
-                          key={String(inc)}
-                          type="button"
-                          aria-pressed={inclusive === inc}
-                          className={`h-11 flex-1 border border-[var(--border)] px-2 text-[11px] font-700 uppercase tracking-wide ${
-                            inclusive === inc ? "bg-[var(--text)] text-[var(--bg)]" : "bg-[var(--elevated)] text-[var(--text-muted)]"
-                          }`}
-                          onClick={() => set(side === "services" ? { servicesInclusive: inc } : { productsInclusive: inc })}
-                        >
-                          {inc ? "Include GST" : "GST added on top"}
-                        </button>
-                      ))}
-                    </div>
+                    {side === "services" ? (
+                      <div className="mt-3 text-[11px] leading-relaxed text-[var(--text-muted)]">
+                        Whether GST is inside a service's price is set per service below.
+                      </div>
+                    ) : (
+                      <>
+                        <div className="mt-3 text-xs text-[var(--text-secondary)]">Product prices</div>
+                        <div className="mt-1 flex" role="group" aria-label="product prices and GST">
+                          {([false, true] as const).map((inc) => (
+                            <button
+                              key={String(inc)}
+                              type="button"
+                              aria-pressed={inclusive === inc}
+                              className={`h-11 flex-1 border border-[var(--border)] px-2 text-[11px] font-700 uppercase tracking-wide ${
+                                inclusive === inc ? "bg-[var(--text)] text-[var(--bg)]" : "bg-[var(--elevated)] text-[var(--text-muted)]"
+                              }`}
+                              onClick={() => set({ productsInclusive: inc })}
+                            >
+                              {inc ? "Include GST" : "GST added on top"}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
                     <div className="mt-3">
                       <Field label={side === "services" ? "SAC code (optional)" : "HSN code (optional)"}>
                         <input
@@ -198,6 +227,43 @@ export const GstView = () => {
               })}
             </div>
 
+            <div className="mt-5 rounded-xl border border-[var(--border-subtle)] p-4">
+              <div className="admin-kicker">Which services include GST in their price</div>
+              <p className="mt-1 text-[11px] leading-relaxed text-[var(--text-muted)]">
+                Switched on: the customer pays the menu price and the GST is taken out of it. Switched off: the GST is added on top of the menu
+                price. Haircuts and beard start switched on.
+              </p>
+              <div className="mt-3 grid gap-4 md:grid-cols-2">
+                {orderedGroups.map(([group, items]) => (
+                  <div key={group}>
+                    <div className="mb-1 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">{group}</div>
+                    <ul className="divide-y divide-[var(--border-subtle)] border-y border-[var(--border-subtle)]">
+                      {items.map((svc) => {
+                        const on = draft.inclusiveServiceIds.includes(svc.id)
+                        return (
+                          <li key={svc.id} className="flex items-center justify-between gap-3 py-2">
+                            <span className="min-w-0 text-sm">{svc.name}</span>
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={on}
+                              aria-label={`${svc.name}: GST ${on ? "included in the price" : "added on top"}`}
+                              className={`relative h-7 w-12 shrink-0 rounded-full border transition-colors ${
+                                on ? "border-[#3D6FA8] bg-[#3D6FA8]" : "border-[var(--border)] bg-[var(--elevated)]"
+                              }`}
+                              onClick={() => toggleService(svc.id)}
+                            >
+                              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${on ? "left-6" : "left-0.5"}`} />
+                            </button>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <button
               className="admin-primary-button mt-5 w-full justify-center"
               disabled={!dirty || !valid}
@@ -206,7 +272,7 @@ export const GstView = () => {
                 actions.request({
                   title: "Save the GST settings?",
                   message: cfg.enabled
-                    ? `New bills will carry GSTIN ${cfg.gstin}: services ${cfg.services.rate}% (${cfg.services.inclusive ? "included in" : "added to"} the price), products ${cfg.products.rate}% (${cfg.products.inclusive ? "included in" : "added to"} the price). Bills already issued do not change.`
+                    ? `New bills will carry GSTIN ${cfg.gstin}: services ${cfg.services.rate}% (included in the price for ${cfg.inclusiveServiceIds.length} service${cfg.inclusiveServiceIds.length === 1 ? "" : "s"}, added on top for the rest), products ${cfg.products.rate}% (${cfg.products.inclusive ? "included in" : "added to"} the price). Bills already issued do not change.`
                     : "New bills will be issued without GST. Bills already issued do not change.",
                   confirmLabel: "Save",
                   action: save,
@@ -222,7 +288,7 @@ export const GstView = () => {
             <div className="flex items-center gap-2 font-display text-lg font-700 uppercase tracking-wider">
               <Receipt size={17} /> Example
             </div>
-            <p className="mt-1 text-[11px] text-[var(--text-muted)]">A bill with ₹1,000 of services and ₹1,000 of products, no discount.</p>
+            <p className="mt-1 text-[11px] text-[var(--text-muted)]">A haircut at ₹300 (GST in the price), a ₹1,200 facial (GST on top) and a ₹599 product, no discount.</p>
             {example && cfg.enabled ? (
               <dl className="mt-4 grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 text-sm [font-variant-numeric:tabular-nums]">
                 <dt className="admin-kicker col-span-2 mt-1">Services</dt>

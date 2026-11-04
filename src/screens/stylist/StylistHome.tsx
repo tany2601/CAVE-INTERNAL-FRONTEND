@@ -2,7 +2,7 @@ import { useState } from "react"
 import { StylistNav } from "../../components/layout"
 import { SectionLabel } from "../../components/ui"
 import { StylistStats } from "../../components/StylistStats"
-import { formatDuration, formatAmount, formatMinutes, sessionMinutes } from "../../lib/format"
+import { formatDuration, formatDateTime, formatAmount, formatMinutes, sessionMinutes } from "../../lib/format"
 import { sumMoney } from "../../lib/money"
 import { useBranchData } from "../../context/BranchDataContext"
 import { Session } from "../../types"
@@ -195,6 +195,10 @@ export default function StylistHome({
                           .map((service) => service.name)
                           .join(" · ")}
                       </div>
+                      <div className="text-[10px] text-[var(--text-muted)] mt-0.5">
+                        Started {formatDateTime(session.startTime)}
+                        {session.closedAt && ` · Billed ${formatDateTime(session.closedAt)}`}
+                      </div>
                     </div>
                     <div className="text-right shrink-0 pl-3">
                       <div className="font-display font-700 text-[var(--text)]">
@@ -248,6 +252,9 @@ function SessionCard({
           </div>
           <div className="flex items-center gap-1 text-[10px] text-[var(--text-muted)] mt-1">
             <Clock size={10} /> {formatDuration(session.startTime)}
+          </div>
+          <div className="text-[10px] text-[var(--text-muted)] mt-0.5">
+            Started {formatDateTime(session.startTime)}
           </div>
         </div>
         <button

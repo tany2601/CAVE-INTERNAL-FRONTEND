@@ -6,6 +6,16 @@ export const formatTime = (date: Date): string => {
   })
 }
 
+/** "4 Nov, 10:05 am" */
+export const formatDateTime = (date: Date | string): string =>
+  new Date(date).toLocaleString("en-IN", {
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  })
+
 export const formatDuration = (start: Date): string => {
   const mins = Math.max(0, Math.floor((Date.now() - start.getTime()) / 60000))
   if (mins < 60) return `${mins}m`

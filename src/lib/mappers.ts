@@ -81,6 +81,7 @@ export const mapService = (m: ApiMenuItem): Service => ({
   id: m.id,
   name: m.name,
   price: m.price,
+  serviceId: m.serviceId,
 })
 
 export const mapExpense = (e: ApiExpense): Expense => ({

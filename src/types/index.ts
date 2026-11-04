@@ -58,6 +58,8 @@ export interface Service {
   id: string;
   name: string;
   price: number;
+  /** The service behind a menu price (GST rules are set per service). Absent on a custom service. */
+  serviceId?: string;
 }
 
 export interface Session {

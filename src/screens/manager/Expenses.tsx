@@ -1,7 +1,7 @@
 import { EmptyNote } from "../../components/ui"
 import { sumMoney } from "../../lib/money"
 import { useState } from "react"
-import { Button, SectionLabel } from "../../components/ui"
+import { Button, PayLabel, SectionLabel } from "../../components/ui"
 import { formatAmount, formatTime } from "../../lib/format"
 import { useBranchData } from "../../context/BranchDataContext"
 import { staffApi } from "../../lib/api"
@@ -344,14 +344,14 @@ function AddExpenseSheet({
               {(["cash", "gpay"] as const).map((m) => (
                 <button
                   key={m}
-                  className={`flex-1 h-11 rounded-sm font-display font-700 tracking-wider uppercase text-xs tap-target transition-all ${
+                  className={`flex flex-1 items-center justify-center h-11 rounded-sm font-display font-700 tracking-wider uppercase text-xs tap-target transition-all ${
                     mode === m
                       ? "bg-[var(--text)] text-[var(--bg)]"
                       : "bg-[var(--elevated)] border border-[var(--border)] text-[var(--text-muted)]"
                   }`}
                   onClick={() => setMode(m)}
                 >
-                  {m === "gpay" ? "GPay" : "Cash"}
+                  <PayLabel mode={m} />
                 </button>
               ))}
             </div>

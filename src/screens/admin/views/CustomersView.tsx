@@ -7,19 +7,20 @@ import {
 import { adminApi } from "../../../lib/api"
 import { useAsyncData } from "../../../hooks/useAsyncData"
 import { useAdminBranches } from "../../../hooks/useAdminBranches"
+import { formatDateTime } from "../../../lib/format"
 import { formatMoney } from "../adminTypes"
 import { AsyncNotice, PageHeading, AdminSelect, StatusBadge, ViewMoreButton } from "../components"
 
 const SORTS = { "Top Spenders": "SPEND", "Most Visits": "VISITS", Recent: "RECENT" } as const
 
-const shortDate = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "—"
+const shortDate = (iso: string | null) => (iso ? formatDateTime(iso) : "—")
 
 export function CustomersView() {
   const [query, setQuery] = useState("")
   const [branch, setBranch] = useState("All Branches")
   const [limit, setLimit] = useState(7)
   const [sort, setSort] = useState<keyof typeof SORTS>("Top Spenders")
+  const [open, setOpen] = useState<string | null>(null)
   const branchList = useAdminBranches()
   const { data, loading, error, reload } = useAsyncData(
     () =>
@@ -141,10 +142,23 @@ export function CustomersView() {
               </div>
             )}
             <div className="flex flex-col">
-              {visible.slice(0, limit).map((customer, index) => (
+              {visible.slice(0, limit).map((customer, index) => {
+                const profile = data?.data[index]
+                const isOpen = !!profile && open === profile.id
+                return (
+                <div key={`${customer[0]}-${index}`}>
                 <article
-                  key={`${customer[0]}-${index}`}
-                  className="customer-directory-row"
+                  className="customer-directory-row cursor-pointer"
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={isOpen}
+                  onClick={() => profile && setOpen(isOpen ? null : profile.id)}
+                  onKeyDown={(e) => {
+                    if ((e.key === "Enter" || e.key === " ") && profile) {
+                      e.preventDefault()
+                      setOpen(isOpen ? null : profile.id)
+                    }
+                  }}
                 >
                   <div className="w-11 h-11 rounded-full bg-[var(--elevated)] flex items-center justify-center font-display font-800">
                     {customer[0].slice(0, 2).toUpperCase()}
@@ -171,10 +185,44 @@ export function CustomersView() {
                   </div>
                   <ChevronRight
                     size={16}
-                    className="hidden sm:block text-[var(--text-muted)]"
+                    className={`hidden sm:block text-[var(--text-muted)] transition-transform ${isOpen ? "rotate-90" : ""}`}
                   />
                 </article>
-              ))}
+                {isOpen && profile && (
+                  <div className="mx-1 mb-3 overflow-x-auto border border-[var(--border-subtle)] bg-[var(--surface)]">
+                    <table className="w-full min-w-[34rem] text-left text-xs">
+                      <thead>
+                        <tr className="text-[9px] uppercase tracking-wider text-[var(--text-muted)]">
+                          <th className="px-3 py-2 font-600">Session started</th>
+                          <th className="px-3 py-2 font-600">Bill generated</th>
+                          <th className="px-3 py-2 font-600">Branch</th>
+                          <th className="px-3 py-2 font-600">Services</th>
+                          <th className="px-3 py-2 text-right font-600">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {profile.visitLog.map((v) => (
+                          <tr key={v.id} className="border-t border-[var(--border-subtle)] align-top">
+                            <td className="px-3 py-2 whitespace-nowrap">{formatDateTime(v.startedAt)}</td>
+                            <td className="px-3 py-2 whitespace-nowrap">
+                              {v.billedAt ? formatDateTime(v.billedAt) : "—"}
+                              {v.invoiceNumber && <div className="text-[10px] text-[var(--text-muted)]">{v.invoiceNumber}</div>}
+                            </td>
+                            <td className="px-3 py-2">{v.branch}</td>
+                            <td className="px-3 py-2 text-[var(--text-secondary)]">{v.services || "—"}</td>
+                            <td className="px-3 py-2 text-right whitespace-nowrap">{formatMoney(v.amount)}</td>
+                          </tr>
+                        ))}
+                        {profile.visitLog.length === 0 && (
+                          <tr><td colSpan={5} className="px-3 py-3 text-[var(--text-muted)]">No visits yet.</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                </div>
+                )
+              })}
             </div>
             {visible.length > limit && (
               <ViewMoreButton onClick={() => setLimit((value) => value + 7)} />

@@ -155,6 +155,8 @@ export interface ApiGstPart {
 export interface ApiSessionGst {
   services: ApiGstPart
   products: ApiGstPart
+  /** The services whose price included the GST on this bill (the rest had it added on top). */
+  inclusiveServiceIds: string[]
   taxable: number
   cgst: number
   sgst: number
@@ -414,6 +416,16 @@ export interface CustomersReport {
     favouriteService: string
     lastVisit: string | null
     branch: string
+    /** The most recent visits: when each session started and when its bill was generated. */
+    visitLog: {
+      id: string
+      startedAt: string
+      billedAt: string | null
+      branch: string
+      amount: number
+      invoiceNumber: string | null
+      services: string
+    }[]
   }[]
 }
 

@@ -1,16 +1,17 @@
 import { useRef, useState } from "react"
 import { Session, Service } from "../../types"
-import { Button, SectionLabel, AmountRow, Select, ServiceTile, PhoneInput, HScroller } from "../../components/ui"
+import { Button, SectionLabel, AmountRow, Select, ServiceColorTile, PhoneInput, HScroller, QtyStepper, PayLabel, QuickSteps } from "../../components/ui"
 import { isValidPhone, sanitizePhone } from "../../lib/phone"
 import { billNo, billText, invoiceOf, whatsappLink } from "../../lib/billText"
-import { billGst, type GstConfig } from "../../lib/gst"
+import { billGst, serviceNets, type GstConfig } from "../../lib/gst"
+import { assignServiceColors } from "../../lib/serviceColors"
 import { formatAmount } from "../../lib/format"
 import { round2, sumMoney } from "../../lib/money"
 import { freeHaircutIndex } from "../../lib/loyalty"
 import { discountOn, groupLines, gstRows, parseValue, withQty, type DiscountMode } from "../../lib/billing"
 import type { BranchDiscountConfig, DiscountSetting } from "../../types/api"
 import { useBranchData } from "../../context/BranchDataContext"
-import { X, Plus, Minus, Check } from "lucide-react"
+import { X, Plus, Minus, Check, ArrowLeft } from "lucide-react"
 
 interface Props {
   session: Session
@@ -30,7 +31,10 @@ interface Props {
     /** The total on screen; the server refuses the bill if it works out a different one. */
     total: number
   }) => Promise<{ id: string; session?: Session } | void> | { id: string; session?: Session } | void
-  onCancel: () => void
+  /** A quick bill: the bill is made in steps (services, products, then the bill) instead of one long page. */
+  wizard?: boolean
+  /** May be async (a quick bill is removed from the server); if it throws, the message is shown and the bill stays open. */
+  onCancel: () => void | Promise<void>
   /** Sell products only: no services, and no stylist or customer to bill. */
   productOnly?: boolean
 }
@@ -76,7 +80,7 @@ function startingDiscounts(session: Session, config: BranchDiscountConfig, editi
   return { services: noDiscount, products: noDiscount }
 }
 
-export default function CloseSession({ session, onComplete, onCancel, productOnly = false }: Props) {
+export default function CloseSession({ session, onComplete, onCancel, productOnly = false, wizard = false }: Props) {
   const { services: SERVICES, products: checkoutProducts, getStylist } =
     useBranchData()
   // Retail products managed by admins (Admin → Products).
@@ -87,6 +91,18 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
     image: p.imageUrl ?? undefined,
   }))
   const [submitting, setSubmitting] = useState(false)
+  // Quick bill: which step is showing. Everything else about the bill (totals, GST, discounts) is the same page.
+  const [step, setStep] = useState<"services" | "products" | "summary">("services")
+  const [confirmCancel, setConfirmCancel] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+  const [cancelError, setCancelError] = useState<string | null>(null)
+  const scroller = useRef<HTMLDivElement | null>(null)
+  const goTo = (next: "services" | "products" | "summary") => {
+    setStep(next)
+    scroller.current?.scrollTo({ top: 0 })
+  }
+  /** Is this part of the page showing? (A normal bill shows everything.) */
+  const showIn = (...steps: Array<"services" | "products" | "summary">) => !wizard || steps.includes(step)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [selectedServices, setSelectedServices] = useState<Service[]>(
     session.services,
@@ -98,12 +114,11 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
   const [customTip, setCustomTip] = useState(
     ![0, 50, 100, 200].includes(session.tip ?? 0),
   )
-  const [tipMode, setTipMode] = useState<"cash" | "gpay">(
-    session.tipMode ?? "cash",
-  )
-  const [paymentMode, setPaymentMode] = useState<"cash" | "gpay">(
-    session.paymentMode ?? "cash",
-  )
+  // Nothing is pre-selected on a new bill: a button lights up only once the person has tapped it. A bill being
+  // corrected opens with what was saved.
+  const [tipTouched, setTipTouched] = useState(editing)
+  const [tipMode, setTipMode] = useState<"cash" | "gpay" | null>(editing ? (session.tipMode ?? session.paymentMode ?? null) : null)
+  const [paymentMode, setPaymentMode] = useState<"cash" | "gpay" | null>(editing ? (session.paymentMode ?? null) : null)
   const [products, setProducts] = useState<Product[]>(
     (session.products ?? []).map((p) => ({ ...p })),
   )
@@ -151,6 +166,8 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
   // Same arithmetic as the server (paise-exact), so the bill shown here is the bill that gets saved.
   // Menu items are billed at today's menu price. On the customer's free (6th) visit the cheapest
   // haircut is ₹0, which also applies when a manager adds it later while editing the bill.
+  const serviceColors = assignServiceColors(SERVICES.map((s) => s.name))
+  const colorOf = (name: string) => serviceColors.get(name) ?? "#475569"
   const menuPrice = new Map(SERVICES.map((service) => [service.id, service.price]))
   const pricedServices = selectedServices.map((service) => ({
     ...service,
@@ -181,7 +198,19 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
       ? { services: session.gst.services, products: session.gst.products }
       : null
     : gstConfig
-  const gst = gstTerms ? billGst(gstTerms, servicesNet, productsNet) : null
+  // Services whose price includes GST (haircuts and beard unless the admin chose otherwise) and the rest, which
+  // have it added on top, share the services discount in proportion (same rule as the server).
+  const inclusiveIds = (editing ? session.gst?.inclusiveServiceIds : gstConfig?.inclusiveServiceIds) ?? []
+  const serviceIdOf = new Map(SERVICES.map((s) => [s.id, s.serviceId]))
+  const includesGst = (s: Service) => {
+    const serviceId = serviceIdOf.get(s.id)
+    return serviceId ? inclusiveIds.includes(serviceId) : (gstTerms?.services.inclusive ?? false)
+  }
+  const inclusiveGross = sumMoney(billServices.filter(includesGst).map((s) => s.price))
+  const nets = serviceNets(inclusiveGross, round2(serviceTotal - inclusiveGross), serviceDiscountAmount)
+  const gst = gstTerms
+    ? billGst(gstTerms, { servicesInclusive: nets.inclusive, servicesExclusive: nets.exclusive, products: productsNet })
+    : null
   const total = Math.max(0, round2((gst ? gst.payable : servicesNet + productsNet) + tip))
   // What is sent for each part: a percentage as typed (at most 100), or the rupees actually taken off.
   const serviceDiscount = {
@@ -197,7 +226,6 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
   // Summary lines: the same service several times is one line with its quantity.
   const serviceLines = groupLines(billServices)
   const productLines = groupLines(products.flatMap((p) => Array.from({ length: p.qty }, () => ({ name: p.name, price: p.price }))))
-  const menuServiceGroups = [...new Set(selectedServices.filter((s) => menuIds.has(s.id)).map((s) => s.id))]
 
   const updateCatalogProduct = (product: Product) => {
     setProducts((current) => {
@@ -208,6 +236,15 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
       )
     })
   }
+
+  const decreaseCatalogProduct = (product: Product) =>
+    setProducts((current) => {
+      const at = current.findIndex((item) => item.name === product.name)
+      if (at < 0) return current
+      return current
+        .map((item, i) => (i === at ? { ...item, qty: item.qty - 1 } : item))
+        .filter((item) => item.qty > 0)
+    })
 
   const updateQuantity = (index: number, delta: number) => {
     setProducts((current) =>
@@ -221,12 +258,62 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
     )
   }
 
+  const closeBill = async () => {
+    setSubmitting(true)
+    setSubmitError(null)
+    // Manual WhatsApp mode: browsers only let a tap open a new window, and billing takes a moment,
+    // so a blank window is opened right now and pointed at the customer's chat once the bill is saved.
+    const savedNumber = sanitizePhone(session.customerPhone ?? "")
+    const chatNumber = isValidPhone(savedNumber) ? savedNumber : whatsapp
+    const chatWindow =
+      waMode === "manual" && !editing && isValidPhone(chatNumber) ? window.open("", "_blank") : null
+    try {
+      const closed = await onComplete({
+        services: billServices,
+        tip,
+        tipMode: tipMode ?? paymentMode!,
+        paymentMode: paymentMode!,
+        products,
+        discount,
+        serviceDiscount,
+        productDiscount,
+        whatsappTo: !session.customerPhone && isValidPhone(whatsapp) ? whatsapp : undefined,
+        total,
+      })
+      if (chatWindow) {
+        const link = whatsappLink(
+          chatNumber,
+          billText({
+            customerName: session.customerName,
+            branchName,
+            services: billServices,
+            products,
+            discountAmount: discount,
+            tip,
+            total: closed?.session?.total ?? total,
+            paymentMode: paymentMode!,
+            billNo: billNo(closed?.id ?? session.id),
+            invoice: invoiceOf(closed?.session, gstConfig, branchAddress, branchPhone),
+          }),
+        )
+        if (link) chatWindow.location.href = link
+        else chatWindow.close()
+      }
+    } catch (e) {
+      chatWindow?.close()
+      setSubmitError(
+        e instanceof Error ? e.message : "Could not close the session.",
+      )
+      setSubmitting(false)
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-40 bg-[var(--bg)] flex flex-col animate-slide-up">
       <div className="flex items-center justify-between px-5 pt-page pb-4 border-b border-[var(--border-subtle)]">
         <div>
           <div className="font-display font-800 tracking-wider uppercase text-base text-[var(--text)]">
-            {productOnly ? "Sell products" : editing ? "Edit session" : "Complete session"}
+            {wizard ? "Quick bill" : productOnly ? "Sell products" : editing ? "Edit session" : "Complete session"}
           </div>
           <div className="text-[10px] text-[var(--text-muted)] mt-0.5">
             {productOnly ? "Products only · no services" : `${session.customerName} · ${stylist ? `with ${stylist.name}` : "No stylist assigned"}`}
@@ -234,15 +321,39 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
         </div>
         <button
           className="w-9 h-9 flex items-center justify-center text-[var(--text-muted)]"
-          onClick={onCancel}
+          aria-label="Cancel"
+          onClick={wizard ? () => setConfirmCancel(true) : onCancel}
         >
           <X size={18} />
         </button>
       </div>
+      {wizard && (
+        <div className="border-b border-[var(--border-subtle)] px-5 py-3">
+          <QuickSteps current={step === "services" ? 2 : step === "products" ? 3 : 4} />
+        </div>
+      )}
 
-      <div className="flex-1 overflow-y-auto">
+      <div ref={scroller} className="flex-1 overflow-y-auto">
         <div className="px-5 py-5 flex flex-col gap-7">
-          {!productOnly && (
+          {wizard && step === "services" && (
+            <div className="order-first">
+              <h1 className="font-display text-2xl font-800 leading-tight text-[var(--text)]">What did the customer have?</h1>
+              <p className="mt-1 text-sm text-[var(--text-muted)]">Tap each service once. Tap again, or use + and −, if the customer had it more than once.</p>
+            </div>
+          )}
+          {wizard && step === "products" && (
+            <div className="order-first">
+              <h1 className="font-display text-2xl font-800 leading-tight text-[var(--text)]">Did the customer buy a product?</h1>
+              <p className="mt-1 text-sm text-[var(--text-muted)]">Tap the product to add it. If the customer bought nothing, tap “No product”.</p>
+            </div>
+          )}
+          {wizard && step === "summary" && (
+            <div className="order-first">
+              <h1 className="font-display text-2xl font-800 leading-tight text-[var(--text)]">Check the bill</h1>
+              <p className="mt-1 text-sm text-[var(--text-muted)]">Look at the total, add a discount or tip if needed, choose how the customer paid, then close the bill.</p>
+            </div>
+          )}
+          {!productOnly && showIn("services") && (
             <>
           {session.freeVisit && (
             <div
@@ -271,6 +382,7 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
                     }`}
                     onClick={() => addService(service)}
                   >
+                    <span aria-hidden className="mr-2 inline-block h-2.5 w-2.5 rounded-full align-middle" style={{ background: colorOf(service.name) }} />
                     {service.name} · {formatAmount(service.price)}
                     {qty > 0 && ` · ×${qty}`}
                   </button>
@@ -281,55 +393,19 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
 
           <div>
             <SectionLabel>All services</SectionLabel>
-            <div className="grid grid-cols-2 gap-2.5">
-              {SERVICES.map((service, index) => (
-                <ServiceTile
+            <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3">
+              {SERVICES.map((service) => (
+                <ServiceColorTile
                   key={service.id}
                   name={service.name}
                   price={service.price}
-                  index={index}
-                  selected={qtyOf(service.id) > 0}
+                  color={colorOf(service.name)}
                   qty={qtyOf(service.id)}
-                  onToggle={() => addService(service)}
+                  onAdd={() => addService(service)}
+                  onRemove={() => removeServiceUnit(service.id)}
                 />
               ))}
             </div>
-
-            {/* The services on the bill, with how many of each: three people, three haircuts. */}
-            {menuServiceGroups.length > 0 && (
-              <div className="mt-3 flex flex-col gap-2" aria-label="Selected services">
-                {menuServiceGroups.map((id) => {
-                  const service = SERVICES.find((x) => x.id === id)!
-                  const qty = qtyOf(id)
-                  return (
-                    <div key={id} className="flex items-center gap-3 bg-[var(--surface)] border border-[var(--border-subtle)] p-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm text-[var(--text)] truncate">{service.name}</div>
-                        <div className="text-xs text-[var(--text-muted)] mt-0.5">
-                          {formatAmount(service.price)} each
-                          {qty > 1 && ` · ${formatAmount(round2(service.price * qty))}`}
-                        </div>
-                      </div>
-                      <button
-                        aria-label={`One less ${service.name}`}
-                        className="w-8 h-8 flex items-center justify-center border border-[var(--border)] text-[var(--text)]"
-                        onClick={() => removeServiceUnit(id)}
-                      >
-                        <Minus size={12} />
-                      </button>
-                      <span className="font-display font-700 text-sm text-[var(--text)] w-5 text-center">{qty}</span>
-                      <button
-                        aria-label={`One more ${service.name}`}
-                        className="w-8 h-8 flex items-center justify-center border border-[var(--border)] text-[var(--text)]"
-                        onClick={() => addService(service)}
-                      >
-                        <Plus size={12} />
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
 
             <div className="mt-3 flex flex-col gap-2">
               {customServices.map((service) => (
@@ -392,6 +468,7 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
             </>
           )}
 
+          {showIn("products") && (
           <div>
             <SectionLabel>Add products</SectionLabel>
             {CATALOG.length === 0 && (
@@ -405,43 +482,47 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
                 const qty = products.filter((p) => p.name === product.name).reduce((n, p) => n + p.qty, 0)
                 const selected = qty > 0
                 return (
-                  <button
+                  <div
                     key={product.name}
-                    aria-pressed={selected}
-                    className={`relative block w-full overflow-hidden border text-left bg-[var(--surface)] transition-colors ${
+                    className={`relative overflow-hidden border bg-[var(--surface)] transition-colors ${
                       selected ? "border-[var(--text)]" : "border-[var(--border-subtle)]"
                     }`}
-                    onClick={() => updateCatalogProduct(product)}
                   >
-                    {selected && (
-                      <span className="absolute right-1.5 top-1.5 z-10 flex h-6 min-w-6 items-center justify-center rounded-full bg-[var(--text)] px-1.5 text-[11px] font-700 text-[var(--bg)]">
-                        ×{qty}
-                      </span>
-                    )}
-                    {product.image ? (
-                      <img
-                        src={product.image}
-                        alt=""
-                        className={`w-full h-30 md:h-60 xl:h-70 object-cover transition-[filter] duration-200 ${
-                          selected ? "" : "grayscale"
-                        }`}
-                      />
-                    ) : (
-                      <div className="w-full h-20 bg-[var(--elevated)]" />
-                    )}
-                    <div className="p-2">
-                      <MiddleEllipsis text={product.name} className="font-display font-700 text-xs text-[var(--text)]" />
-                      <div className="text-[10px] text-[var(--text-muted)] mt-0.5">
-                        {formatAmount(product.price)}
+                    <button aria-pressed={selected} type="button" className="block w-full text-left" onClick={() => updateCatalogProduct(product)}>
+                      {product.image ? (
+                        <img
+                          src={product.image}
+                          alt=""
+                          className={`w-full h-30 md:h-60 xl:h-70 object-cover transition-[filter] duration-200 ${
+                            selected ? "" : "grayscale"
+                          }`}
+                        />
+                      ) : (
+                        <div className="w-full h-20 bg-[var(--elevated)]" />
+                      )}
+                      <div className="p-2 pb-12">
+                        <MiddleEllipsis text={product.name} className="font-display font-700 text-xs text-[var(--text)]" />
+                        <div className="text-[10px] text-[var(--text-muted)] mt-0.5">{formatAmount(product.price)}</div>
                       </div>
-                    </div>
-                  </button>
+                    </button>
+                    {/* The count lives inside the card, at the bottom. */}
+                    {selected && (
+                      <QtyStepper
+                        qty={qty}
+                        label={product.name}
+                        onMinus={() => decreaseCatalogProduct(product)}
+                        onPlus={() => updateCatalogProduct(product)}
+                        className="absolute bottom-2 right-2"
+                      />
+                    )}
+                  </div>
                 )
               })}
             </HScroller>
 
             <div className="mt-3 flex flex-col gap-2">
-              {products.map((product, index) => (
+              {products.map((product, index) =>
+                CATALOG.some((c) => c.name === product.name) ? null : (
                 <div
                   key={index}
                   className="flex items-center gap-3 bg-[var(--surface)] border border-[var(--border-subtle)] p-3"
@@ -518,7 +599,10 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
               </button>
             </div>
           </div>
+          )}
 
+          {showIn("summary") && (
+            <>
           <div>
             <SectionLabel>Discount</SectionLabel>
             {startedWithBranchDiscount && (
@@ -553,11 +637,12 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
                 <button
                   key={amount}
                   className={`flex-1 py-2 border text-xs ${
-                    !customTip && tip === amount
+                    tipTouched && !customTip && tip === amount
                       ? "bg-[var(--text)] text-[var(--bg)] border-[var(--text)]"
                       : "border-[var(--border)] text-[var(--text-muted)]"
                   }`}
                   onClick={() => {
+                    setTipTouched(true)
                     setCustomTip(false)
                     setTip(amount)
                   }}
@@ -572,6 +657,7 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
                     : "border-[var(--border)] text-[var(--text-muted)]"
                 }`}
                 onClick={() => {
+                  setTipTouched(true)
                   setCustomTip(true)
                   setTip(0)
                 }}
@@ -598,15 +684,16 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
                 />
               </div>
             )}
-            <Segmented value={tipMode} onChange={setTipMode} />
+            <div className="mb-1.5 text-[11px] text-[var(--text-muted)]">Tip paid by{tip > 0 ? "" : " (if there is a tip)"}</div>
+            <Segmented value={tipMode} onChange={setTipMode} label="Tip paid by" />
           </div>
 
           <div>
             <SectionLabel>Payment method</SectionLabel>
-            <Segmented value={paymentMode} onChange={setPaymentMode} />
+            <Segmented value={paymentMode} onChange={setPaymentMode} label="Payment method" />
           </div>
 
-          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-4">
+          <div className={`bg-[var(--surface)] border border-[var(--border-subtle)] p-4 ${wizard ? "order-first" : ""}`}>
             <SectionLabel>Summary</SectionLabel>
             {serviceLines.length === 0 && productLines.length === 0 && (
               <div className="text-xs text-[var(--text-muted)] pb-2">Nothing selected yet.</div>
@@ -638,7 +725,7 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
                 gstRows(gst, { services: gstConfig?.servicesCode, products: gstConfig?.productsCode }).map((row) => (
                   <AmountRow key={row.label} label={row.label} value={formatAmount(row.amount)} />
                 ))}
-              {tip > 0 && <AmountRow label={`Tip (${tipMode})`} value={formatAmount(tip)} />}
+              {tip > 0 && <AmountRow label={tipMode ? `Tip (${tipMode === "gpay" ? "GPay" : "cash"})` : "Tip"} value={formatAmount(tip)} />}
             </div>
             <div className="border-t border-[var(--border-subtle)] mt-2 pt-3">
               <AmountRow label="Total" value={formatAmount(total)} bold />
@@ -669,6 +756,8 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
               )}
             </div>
           )}
+            </>
+          )}
         </div>
       </div>
 
@@ -678,75 +767,120 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
             {submitError}
           </div>
         )}
-        <Button
-          fullWidth
-          size="lg"
-          disabled={
-            (productOnly ? products.length === 0 || subtotal <= 0 : selectedServices.length === 0) ||
-            customInvalid ||
-            submitting
-          }
-          onClick={async () => {
-            setSubmitting(true)
-            setSubmitError(null)
-            // Manual WhatsApp mode: browsers only let a tap open a new window, and billing takes a moment,
-            // so a blank window is opened right now and pointed at the customer's chat once the bill is saved.
-            const savedNumber = sanitizePhone(session.customerPhone ?? "")
-            const chatNumber = isValidPhone(savedNumber) ? savedNumber : whatsapp
-            const chatWindow =
-              waMode === "manual" && !editing && isValidPhone(chatNumber) ? window.open("", "_blank") : null
-            try {
-              const closed = await onComplete({
-                services: billServices,
-                tip,
-                tipMode,
-                paymentMode,
-                products,
-                discount,
-                serviceDiscount,
-                productDiscount,
-                whatsappTo: !session.customerPhone && isValidPhone(whatsapp) ? whatsapp : undefined,
-                total,
-              })
-              if (chatWindow) {
-                const link = whatsappLink(
-                  chatNumber,
-                  billText({
-                    customerName: session.customerName,
-                    branchName,
-                    services: billServices,
-                    products,
-                    discountAmount: discount,
-                    tip,
-                    total: closed?.session?.total ?? total,
-                    paymentMode,
-                    billNo: billNo(closed?.id ?? session.id),
-                    invoice: invoiceOf(closed?.session, gstConfig, branchAddress, branchPhone),
-                  }),
-                )
-                if (link) chatWindow.location.href = link
-                else chatWindow.close()
-              }
-            } catch (e) {
-              chatWindow?.close()
-              setSubmitError(
-                e instanceof Error ? e.message : "Could not close the session.",
-              )
-              setSubmitting(false)
-            }
-          }}
-        >
-          {submitting
-            ? editing
-              ? "Saving…"
-              : "Closing…"
-            : editing
-              ? `Save changes · ${formatAmount(total)}`
-              : productOnly
-                ? `Bill ${formatAmount(total)}`
-                : `Close & send ${formatAmount(total)} bill`}
-        </Button>
+        {wizard && step === "services" && (
+          <>
+            {(selectedServices.length === 0 || customInvalid) && (
+              <div className="mb-2 text-center text-sm text-[var(--text-muted)]">
+                {customInvalid ? "Fill in the name and price of the custom service." : "Tap at least one service to continue."}
+              </div>
+            )}
+            <Button fullWidth size="lg" disabled={selectedServices.length === 0 || customInvalid} onClick={() => goTo("products")}>
+              Next: products →
+            </Button>
+          </>
+        )}
+        {wizard && step === "products" && (
+          <>
+            {products.length === 0 && (
+              <div className="mb-2 text-center text-sm text-[var(--text-muted)]">Tap a product to add it, or tap “No product”.</div>
+            )}
+            <Button
+              size="lg"
+              fullWidth
+              disabled={products.length === 0 || products.some((p) => p.name.trim() === "" || !(p.price > 0))}
+              onClick={() => goTo("summary")}
+            >
+              Next: bill →
+            </Button>
+            <div className="mt-3 grid grid-cols-[auto_1fr] gap-3">
+              <Button variant="outline" size="lg" aria-label="Back to services" onClick={() => goTo("services")}>
+                <ArrowLeft size={18} />
+              </Button>
+              <Button
+                variant="secondary"
+                size="lg"
+                onClick={() => {
+                  setProducts([])
+                  goTo("summary")
+                }}
+              >
+                No product
+              </Button>
+            </div>
+          </>
+        )}
+        {showIn("summary") && (
+          <>
+            {!submitting && selectedServices.length + products.length > 0 && (!paymentMode || (tip > 0 && !tipMode)) && (
+              <div className="mb-2 text-center text-sm text-[var(--text-muted)]">
+                {!paymentMode ? "Choose how the customer paid to close the bill." : "Choose how the tip was paid."}
+              </div>
+            )}
+            <div className="flex gap-3">
+              {wizard && (
+                <Button variant="outline" size="lg" aria-label="Back to products" onClick={() => goTo("products")}>
+                  <ArrowLeft size={18} />
+                </Button>
+              )}
+              <Button
+                className="flex-1"
+                fullWidth
+                size="lg"
+                disabled={
+                    (productOnly ? products.length === 0 || subtotal <= 0 : selectedServices.length === 0) ||
+                    customInvalid ||
+                    !paymentMode ||
+                    (tip > 0 && !tipMode) ||
+                    submitting
+                  }
+                onClick={closeBill}
+              >
+                  {submitting
+                    ? editing
+                      ? "Saving…"
+                      : "Closing…"
+                    : editing
+                      ? `Save changes · ${formatAmount(total)}`
+                      : productOnly
+                        ? `Bill ${formatAmount(total)}`
+                        : `Close & send ${formatAmount(total)} bill`}
+              </Button>
+            </div>
+          </>
+        )}
       </div>
+      {confirmCancel && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/75 px-6" role="dialog" aria-modal="true" aria-label="Cancel this bill?">
+          <div className="w-full max-w-sm border border-[var(--border)] bg-[var(--surface)] p-5">
+            <div className="font-display text-xl font-800 text-[var(--text)]">Cancel this bill?</div>
+            <p className="mt-2 text-sm text-[var(--text-secondary)]">Nothing has been charged. The customer will be removed and you will go back to the start.</p>
+            <div className="mt-5 flex flex-col gap-2">
+              <Button size="lg" fullWidth onClick={() => setConfirmCancel(false)}>
+                No, keep billing
+              </Button>
+              {cancelError && <div className="text-sm text-[#E06060]">{cancelError}</div>}
+              <Button
+                size="lg"
+                fullWidth
+                variant="destructive"
+                disabled={cancelling}
+                onClick={async () => {
+                  setCancelling(true)
+                  setCancelError(null)
+                  try {
+                    await onCancel()
+                  } catch (e) {
+                    setCancelError(e instanceof Error ? e.message : "Could not cancel the bill. Please try again.")
+                    setCancelling(false)
+                  }
+                }}
+              >
+                {cancelling ? "Cancelling…" : "Yes, cancel the bill"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -769,26 +903,32 @@ function MiddleEllipsis({ text, className = "" }: { text: string; className?: st
   )
 }
 
-function Segmented<T extends "cash" | "gpay">({
+function Segmented({
   value,
   onChange,
+  label,
 }: {
-  value: T
-  onChange: (value: T) => void
+  /** null until the person has chosen: nothing is highlighted before that. */
+  value: "cash" | "gpay" | null
+  onChange: (value: "cash" | "gpay") => void
+  label: string
 }) {
   return (
-    <div className="grid grid-cols-2 gap-2">
-      {(["cash", "gpay"] as T[]).map((mode) => (
+    <div className="grid grid-cols-2 gap-2" role="group" aria-label={label}>
+      {(["cash", "gpay"] as const).map((mode) => (
         <button
           key={mode}
-          className={`h-11 border font-display font-700 uppercase tracking-wider text-xs ${
+          type="button"
+          aria-pressed={value === mode}
+          aria-label={mode === "gpay" ? "GPay" : "Cash"}
+          className={`flex h-12 items-center justify-center border font-display font-700 uppercase tracking-wider text-xs ${
             value === mode
               ? "bg-[var(--text)] text-[var(--bg)] border-[var(--text)]"
               : "bg-[var(--elevated)] text-[var(--text-muted)] border-[var(--border)]"
           }`}
           onClick={() => onChange(mode)}
         >
-          {mode === "gpay" ? "GPay" : "Cash"}
+          <PayLabel mode={mode} />
         </button>
       ))}
     </div>

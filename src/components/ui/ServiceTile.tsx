@@ -1,4 +1,4 @@
-import { Check } from "lucide-react"
+import { QtyStepper } from "./QtyStepper"
 import { formatAmount } from "../../lib/format"
 
 // All colour photographs: tiles are greyscaled by CSS until selected, so a source image that is
@@ -18,6 +18,7 @@ export function ServiceTile({
   index,
   selected,
   onToggle,
+  onDecrease,
   qty = 0,
 }: {
   name: string
@@ -25,6 +26,8 @@ export function ServiceTile({
   index: number
   selected: boolean
   onToggle: () => void
+  /** Take one off (the − on the card). */
+  onDecrease?: () => void
   /** How many are on the bill: shown as a "×2" badge instead of the tick when more than one. */
   qty?: number
 }) {
@@ -34,32 +37,33 @@ export function ServiceTile({
   const title = open > 0 && name.endsWith(")") ? name.slice(0, open) : name
   const detail = open > 0 && name.endsWith(")") ? name.slice(open + 2, -1) : ""
   return (
-    <button
-      type="button"
-      aria-pressed={selected}
-      className={`relative flex h-full min-h-28 flex-col justify-end overflow-hidden text-left border transition-colors ${
-        selected ? "border-white" : "border-[var(--border-subtle)]"
-      }`}
-      onClick={onToggle}
-    >
-      <img
-        src={SERVICE_IMAGES[index % SERVICE_IMAGES.length]}
-        alt=""
-        className={`absolute inset-0 w-full h-full object-cover transition-[filter] duration-200 ${
-          selected ? "" : "grayscale"
+    <div className="relative h-full min-h-28">
+      <button
+        type="button"
+        aria-pressed={selected}
+        className={`relative flex h-full w-full min-h-28 flex-col justify-end overflow-hidden text-left border transition-colors ${
+          selected ? "border-white" : "border-[var(--border-subtle)]"
         }`}
-      />
-      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-black/10" />
-      {selected && (
-        <div className="absolute top-2 right-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-white px-1.5 text-black">
-          {qty > 1 ? <span className="text-[11px] font-700">×{qty}</span> : <Check size={13} />}
+        onClick={onToggle}
+      >
+        <img
+          src={SERVICE_IMAGES[index % SERVICE_IMAGES.length]}
+          alt=""
+          className={`absolute inset-0 w-full h-full object-cover transition-[filter] duration-200 ${
+            selected ? "" : "grayscale"
+          }`}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-black/10" />
+        <div className="relative p-3 pb-12 pt-10 text-white">
+          <div className="font-display font-700 leading-tight tracking-wide">{title}</div>
+          {detail && <div className="mt-1 text-[10px] leading-snug text-white/70">{detail}</div>}
+          <div className="text-xs text-white/65 mt-0.5">{formatAmount(price)}</div>
         </div>
+      </button>
+      {/* The count lives inside the card, at the bottom. */}
+      {selected && onDecrease && (
+        <QtyStepper qty={qty} label={title} onMinus={onDecrease} onPlus={onToggle} className="absolute bottom-2 right-2" />
       )}
-      <div className="relative p-3 pt-10 text-white">
-        <div className="font-display font-700 leading-tight tracking-wide">{title}</div>
-        {detail && <div className="mt-1 text-[10px] leading-snug text-white/70">{detail}</div>}
-        <div className="text-xs text-white/65 mt-0.5">{formatAmount(price)}</div>
-      </div>
-    </button>
+    </div>
   )
 }

@@ -24,6 +24,7 @@ import StylistSelection from "../screens/customer/StylistSelection"
 // Stylist
 import StylistHome from "../screens/stylist/StylistHome"
 import CloseSession from "../screens/stylist/CloseSession"
+import QuickCustomer from "../screens/stylist/QuickCustomer"
 import SessionSuccess from "../screens/stylist/SessionSuccess"
 import Performance from "../screens/stylist/Performance"
 import Checklist from "../screens/stylist/Checklist"
@@ -50,6 +51,7 @@ type AppScreen =
   | "admin-dashboard"
   | "manager-entry"
   | "customer-services"
+  | "quick-customer"
   | "edit-session"
 
 interface SuccessData {
@@ -184,6 +186,10 @@ function AppScreens({ onScreen }: { onScreen: (screen: string) => void }) {
   const [editingSession, setEditingSession] = useState<Session | null>(null)
   /** True while the open bill is a products-only sale (no session exists until it is billed). */
   const [productOnly, setProductOnly] = useState(false)
+  /** True while the open bill is a quick bill (made step by step for a customer in a hurry). */
+  const [quickBill, setQuickBill] = useState(false)
+  const [quickStarting, setQuickStarting] = useState(false)
+  const [quickError, setQuickError] = useState<string | null>(null)
   const [sessionSuccess, setSessionSuccess] = useState<SuccessData | null>(null)
   const [startingSession, setStartingSession] = useState(false)
   const [startError, setStartError] = useState<string | null>(null)
@@ -288,6 +294,7 @@ function AppScreens({ onScreen }: { onScreen: (screen: string) => void }) {
 
   const handleCloseSession = (session: Session) => {
     setProductOnly(false)
+    setQuickBill(false)
     setClosingSession(session)
     nav("close-session")
   }
@@ -450,6 +457,10 @@ function AppScreens({ onScreen }: { onScreen: (screen: string) => void }) {
             : handleStylistNav("home")
         }
         onQuickBill={handleCloseSession}
+        onQuickServices={() => {
+          setQuickError(null)
+          nav("quick-customer")
+        }}
         onProductSale={() => {
           setProductOnly(true)
           setClosingSession({
@@ -461,6 +472,40 @@ function AppScreens({ onScreen }: { onScreen: (screen: string) => void }) {
             status: "active",
           })
           nav("close-session")
+        }}
+      />
+    )
+  }
+
+  // Quick bill, step 1: the session is opened here (so it has a real start time and the customer's free-visit
+  // status is known), then the bill is made in steps. Cancelling afterwards removes it again.
+  if (screen === ("quick-customer" as AppScreen)) {
+    return (
+      <QuickCustomer
+        busy={quickStarting}
+        error={quickError}
+        onCancel={() => nav("welcome")}
+        onNext={async (details) => {
+          setQuickStarting(true)
+          setQuickError(null)
+          try {
+            const created = await staffApi.createSession({
+              customerName: details.name,
+              customerMobile: details.phone,
+              stylistId: details.stylistId,
+              startNow: true,
+            })
+            const opened = mapSession(created)
+            addActiveSession(opened)
+            setProductOnly(false)
+            setQuickBill(true)
+            setClosingSession(opened)
+            nav("close-session")
+          } catch (e) {
+            setQuickError(e instanceof Error ? e.message : "Could not start the bill. Please try again.")
+          } finally {
+            setQuickStarting(false)
+          }
         }}
       />
     )
@@ -571,6 +616,7 @@ function AppScreens({ onScreen }: { onScreen: (screen: string) => void }) {
       <CloseSession
         session={closingSession}
         productOnly={productOnly}
+        wizard={quickBill}
         onComplete={async (data) => {
           const payload = buildBillPayload(
             data,
@@ -602,7 +648,17 @@ function AppScreens({ onScreen }: { onScreen: (screen: string) => void }) {
           nav("session-success" as AppScreen)
           return { id: closed.id, session: mapSession(closed) }
         }}
-        onCancel={() => {
+        onCancel={async () => {
+          if (quickBill) {
+            // The customer was added when the bill was started: remove everything about it again. If that fails
+            // the error goes back to the screen so the bill is not left half-cancelled.
+            await staffApi.discardSession(closingSession.id)
+            void refresh()
+            setQuickBill(false)
+            setClosingSession(null)
+            nav("welcome")
+            return
+          }
           if (productOnly) {
             setProductOnly(false)
             setClosingSession(null)
@@ -626,8 +682,9 @@ function AppScreens({ onScreen }: { onScreen: (screen: string) => void }) {
         total={sessionSuccess.total}
         paymentMode={sessionSuccess.paymentMode}
         onDone={() => {
-          const wasProductSale = productOnly
+          const wasProductSale = productOnly || quickBill
           setProductOnly(false)
+          setQuickBill(false)
           setClosingSession(null)
           setSessionSuccess(null)
           if (wasProductSale) {
