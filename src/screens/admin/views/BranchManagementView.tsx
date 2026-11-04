@@ -27,6 +27,7 @@ interface BranchForm {
   city: string
   state: string
   phone: string
+  reviewUrl: string
   target: number
   image: string | null
   manager: string // staff id, "" = unassigned
@@ -41,12 +42,17 @@ const emptyForm: BranchForm = {
   city: "",
   state: "",
   phone: "",
+  reviewUrl: "",
   target: 0,
   image: null,
   manager: "",
   managerPin: "",
   stylistPin: "",
 }
+
+/** A Google link over https (what the server accepts): g.page, goo.gl, search.google.com, google.com, … */
+const isGoogleLink = (value: string) =>
+  /^https:\/\/(g\.page|g\.co|goo\.gl|maps\.app\.goo\.gl|share\.google|(?:[a-z0-9-]+\.)*google\.(?:com|co\.in|in))(\/|$)/i.test(value.trim())
 
 const toCode = (name: string) =>
   name.toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 20)
@@ -82,6 +88,7 @@ export function BranchManagementView() {
     !!form.code &&
     !!form.location &&
     (form.phone === "" || isValidPhone(form.phone)) &&
+    (form.reviewUrl.trim() === "" || isGoogleLink(form.reviewUrl)) &&
     pinsValid(form) &&
     !photo.uploading &&
     (!!form.id || (form.managerPin !== "" && form.stylistPin !== ""))
@@ -94,6 +101,8 @@ export function BranchManagementView() {
       city: form.city.trim() || undefined,
       state: form.state.trim() || undefined,
       phone: form.phone.trim() || undefined,
+      // Saving an empty box on an existing branch clears the link
+      reviewUrl: form.reviewUrl.trim() || (form.id ? null : undefined),
       imageUrl: form.image ?? undefined,
       monthlyTarget: form.target,
       // Saved in the same request as the branch, so a rejected PIN (e.g. already in use)
@@ -211,6 +220,7 @@ export function BranchManagementView() {
                           city: branch.city ?? "",
                           state: branch.state ?? "",
                           phone: sanitizePhone(branch.phone ?? ""),
+                          reviewUrl: branch.reviewUrl ?? "",
                           target: branch.monthlyTarget,
                           image: branch.imageUrl,
                           manager: branch.managerId ?? "",
@@ -356,6 +366,29 @@ export function BranchManagementView() {
                 placeholder="10-digit mobile number"
               />
             </Field>
+            <div className="sm:col-span-2">
+              <Field label="Google review link (optional)">
+                <input
+                  className="admin-input w-full"
+                  value={editing.reviewUrl}
+                  inputMode="url"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  placeholder="https://g.page/r/…/review"
+                  aria-invalid={editing.reviewUrl.trim() !== "" && !isGoogleLink(editing.reviewUrl)}
+                  onChange={(event) => update({ reviewUrl: event.target.value.trim() })}
+                />
+              </Field>
+              <div
+                className={`mt-1 text-[11px] ${
+                  editing.reviewUrl.trim() !== "" && !isGoogleLink(editing.reviewUrl) ? "text-[#E06060]" : "text-[var(--text-muted)]"
+                }`}
+              >
+                {editing.reviewUrl.trim() !== "" && !isGoogleLink(editing.reviewUrl)
+                  ? "This does not look like a Google review link. It starts with https://g.page/ or https://search.google.com/."
+                  : "Printed at the bottom of this branch's WhatsApp bills so customers can rate the visit."}
+              </div>
+            </div>
             <Field label="Monthly target">
               <input
                 className="admin-input w-full"

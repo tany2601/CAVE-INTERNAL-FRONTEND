@@ -50,6 +50,8 @@ export interface BranchInput {
   city?: string
   state?: string
   phone?: string
+  /** The branch's Google review link; null clears it on an edit. */
+  reviewUrl?: string | null
   imageUrl?: string
   monthlyTarget?: number
   managerId?: string | null

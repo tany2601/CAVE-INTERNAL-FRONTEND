@@ -173,6 +173,8 @@ export interface TodayResponse {
     city?: string | null
     state?: string | null
     phone?: string | null
+    /** Google review link of this branch (printed at the bottom of the bill). */
+    reviewUrl?: string | null
   }
   stylists: ApiStylist[]
   activeSessions: ApiSession[]
@@ -241,6 +243,8 @@ export interface ApiBranch {
   city: string | null
   state: string | null
   phone: string | null
+  /** The branch's Google review link, printed at the bottom of its WhatsApp bills. */
+  reviewUrl?: string | null
   imageUrl: string | null
   monthlyTarget: number
   managerId: string | null

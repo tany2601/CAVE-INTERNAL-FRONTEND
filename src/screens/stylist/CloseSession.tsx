@@ -123,7 +123,7 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
     (session.products ?? []).map((p) => ({ ...p })),
   )
   const stylist = getStylist(session.stylistId)
-  const { whatsapp: waSettings, branchName, branchAddress, branchPhone, gst: gstConfig, discount: branchDiscount } = useBranchData()
+  const { whatsapp: waSettings, branchName, branchAddress, branchPhone, branchReviewUrl, gst: gstConfig, discount: branchDiscount } = useBranchData()
   const [serviceDiscountField, setServiceDiscountField] = useState<DiscountField>(
     () => startingDiscounts(session, branchDiscount, session.status === "closed").services,
   )
@@ -294,6 +294,7 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
             paymentMode: paymentMode!,
             billNo: billNo(closed?.id ?? session.id),
             invoice: invoiceOf(closed?.session, gstConfig, branchAddress, branchPhone),
+            reviewUrl: branchReviewUrl || undefined,
           }),
         )
         if (link) chatWindow.location.href = link

@@ -33,6 +33,8 @@ interface BranchData {
   /** One line (street, city, state) printed on the tax invoice. */
   branchAddress: string
   branchPhone: string
+  /** The branch's Google review link (printed at the bottom of the bill); empty when not set. */
+  branchReviewUrl: string
   /** GSTIN, rates and whether prices include GST; null while GST is off. */
   gst: GstConfig | null
   /** Branch name without the leading "CAVE", e.g. "Karkala". */
@@ -73,6 +75,7 @@ const EMPTY: Omit<
   branchName: "",
   branchAddress: "",
   branchPhone: "",
+  branchReviewUrl: "",
   gst: null,
   stylists: [],
   services: [],
@@ -120,6 +123,7 @@ export function BranchDataProvider({ children }: { children: ReactNode }) {
           .filter(Boolean)
           .join(", "),
         branchPhone: today.branch.phone?.trim() ?? "",
+        branchReviewUrl: today.branch.reviewUrl?.trim() ?? "",
         gst: today.gst?.enabled ? today.gst : null,
         stylists: today.stylists.map(mapStylist),
         services: catalogue ? sortByCategory(catalogue[0]).map(mapService) : prev.services,

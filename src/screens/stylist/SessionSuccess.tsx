@@ -105,7 +105,7 @@ function WhatsappBill({
   total: number
   paymentMode: "cash" | "gpay"
 }) {
-  const { whatsapp, branchName, branchAddress, branchPhone, gst: gstConfig } = useBranchData()
+  const { whatsapp, branchName, branchAddress, branchPhone, branchReviewUrl, gst: gstConfig } = useBranchData()
   const saved = sanitizePhone(session.customerPhone ?? "")
   const [typed, setTyped] = useState("")
   const number = isValidPhone(saved) ? saved : typed
@@ -145,6 +145,7 @@ function WhatsappBill({
     paymentMode,
     billNo: billNo(session.id),
     invoice: invoiceOf(session, gstConfig, branchAddress, branchPhone),
+    reviewUrl: branchReviewUrl || undefined,
   })
   const link = whatsappLink(number, text)
 

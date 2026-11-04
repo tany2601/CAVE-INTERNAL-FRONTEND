@@ -15,6 +15,8 @@ export interface BillTextInput {
   paymentMode: "cash" | "gpay"
   /** Last 6 characters of the session id, as printed on the picture. */
   billNo: string
+  /** The branch's Google review link: the last thing on the bill. */
+  reviewUrl?: string
   /** Present on a GST tax invoice: the seller's details and the tax on the bill. */
   invoice?: {
     number: string
@@ -89,6 +91,7 @@ export function billText(b: BillTextInput): string {
     "",
     "We hope to see you again soon!",
   )
+  if (b.reviewUrl) lines.push("", "Please rate your visit:", b.reviewUrl)
   return lines.join("\n")
 }
 
