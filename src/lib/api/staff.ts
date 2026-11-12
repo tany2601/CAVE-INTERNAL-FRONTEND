@@ -38,6 +38,16 @@ export const createSession = (body: {
     (r) => r.session,
   )
 
+/**
+ * Like createSession, but also says whether the customer already had an open session (which is then returned
+ * instead of a new one). A quick bill must not throw an existing session away when it is cancelled.
+ */
+export const startOrReuseSession = (body: Parameters<typeof createSession>[0]) =>
+  request<{ session: ApiSession; reused?: boolean }>("POST", "/staff/sessions", { body }).then((r) => ({
+    session: r.session,
+    reused: !!r.reused,
+  }))
+
 export const startService = (sessionId: string) =>
   request<{ session: ApiSession }>(
     "POST",

@@ -26,6 +26,8 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return // photos, fonts: leave to the network/browser cache
   if (url.pathname.startsWith("/api/")) return // never cache data
   if (url.pathname === "/version.json" || url.pathname === "/sw.js") return // always straight from the network
+  // The public legal pages are plain HTML pages, not part of the app: never cache them as the app shell.
+  if (/^\/(privacypolicy|termsofservice|datadeletion)(\/|\.html)?$/.test(url.pathname)) return
 
   // Page loads: the network first, so an opened app is always the latest deploy. If the network is slow or
   // down (4 s), the cached shell opens instead, so the app still starts offline or on a weak signal.

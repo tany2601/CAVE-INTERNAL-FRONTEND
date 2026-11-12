@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, lazy, Suspense } from "react"
 import { Screen, Stylist, Customer, Session } from "../types"
 import { staffApi } from "../lib/api"
+import { ApiError } from "../lib/api/http"
 import { mapSession, toApiMode } from "../lib/mappers"
 import { storageKeys, useAuth } from "../context/AuthContext"
 import { useBranchData } from "../context/BranchDataContext"
@@ -189,6 +190,8 @@ function AppScreens({ onScreen }: { onScreen: (screen: string) => void }) {
   /** True while the open bill is a quick bill (made step by step for a customer in a hurry). */
   const [quickBill, setQuickBill] = useState(false)
   const [quickStarting, setQuickStarting] = useState(false)
+  /** False when the quick bill picked up a session the customer already had: cancelling must leave that one alone. */
+  const [quickCreated, setQuickCreated] = useState(true)
   const [quickError, setQuickError] = useState<string | null>(null)
   const [sessionSuccess, setSessionSuccess] = useState<SuccessData | null>(null)
   const [startingSession, setStartingSession] = useState(false)
@@ -489,7 +492,7 @@ function AppScreens({ onScreen }: { onScreen: (screen: string) => void }) {
           setQuickStarting(true)
           setQuickError(null)
           try {
-            const created = await staffApi.createSession({
+            const { session: created, reused } = await staffApi.startOrReuseSession({
               customerName: details.name,
               customerMobile: details.phone,
               stylistId: details.stylistId,
@@ -499,6 +502,7 @@ function AppScreens({ onScreen }: { onScreen: (screen: string) => void }) {
             addActiveSession(opened)
             setProductOnly(false)
             setQuickBill(true)
+            setQuickCreated(!reused)
             setClosingSession(opened)
             nav("close-session")
           } catch (e) {
@@ -650,9 +654,16 @@ function AppScreens({ onScreen }: { onScreen: (screen: string) => void }) {
         }}
         onCancel={async () => {
           if (quickBill) {
-            // The customer was added when the bill was started: remove everything about it again. If that fails
-            // the error goes back to the screen so the bill is not left half-cancelled.
-            await staffApi.discardSession(closingSession.id)
+            // The customer was added when the bill was started: remove everything about it again. A session the
+            // customer already had is left alone. If the server cannot be reached the error goes back to the
+            // screen (so nothing is left half-cancelled); if it simply says "not removable" we just leave.
+            if (quickCreated) {
+              try {
+                await staffApi.discardSession(closingSession.id)
+              } catch (e) {
+                if (!(e instanceof ApiError && e.status >= 400 && e.status < 500)) throw e
+              }
+            }
             void refresh()
             setQuickBill(false)
             setClosingSession(null)

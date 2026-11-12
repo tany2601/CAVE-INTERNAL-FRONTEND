@@ -114,15 +114,14 @@ export default function QuickCustomer({
             <button
               type="button"
               aria-pressed={noNumber}
-              className={`mt-1 h-12 border px-4 text-left text-sm ${
-                noNumber ? "border-[var(--text)] bg-[var(--text)] text-[var(--bg)]" : "border-[var(--border)] text-[var(--text-secondary)]"
-              }`}
+              className="mt-1 flex min-h-12 items-center justify-center rounded-sm border border-white/25 px-4 py-2 text-center text-sm font-600 text-white shadow-[0_2px_0_rgba(0,0,0,0.35)] active:translate-y-px"
+              style={{ background: noNumber ? "#15803D" : "#475569" }}
               onClick={() => {
                 setNoNumber((v) => !v)
                 setPhone("")
               }}
             >
-              {noNumber ? "✓ No mobile number for this customer" : "Customer does not want to give a number"}
+              {noNumber ? "✓ No mobile number for this customer (tap to undo)" : "Customer does not want to give a number"}
             </button>
           </div>
 

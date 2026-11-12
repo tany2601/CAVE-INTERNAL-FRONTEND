@@ -631,8 +631,22 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
             </div>
           </div>
 
-          <div>
-            <SectionLabel>Tip</SectionLabel>
+          <div
+            className={`rounded-md border-2 bg-[var(--surface)] p-4 ${
+              paymentMode ? "border-[#15803D] shadow-[0_0_0_3px_rgba(21,128,61,0.18)]" : "border-[#D97706] shadow-[0_0_0_3px_rgba(217,119,6,0.22)]"
+            }`}
+          >
+            <BoxHeading
+              title="Payment method"
+              hint={paymentMode ? "✓ Chosen. Tap the other one to change." : "Tap how the customer paid: Cash or GPay."}
+              good={!!paymentMode}
+              needed={!paymentMode}
+            />
+            <Segmented value={paymentMode} onChange={setPaymentMode} label="Payment method" />
+          </div>
+          
+          <div className="rounded-md border-2 border-[#3D6FA8] bg-[var(--surface)] p-4 shadow-[0_0_0_3px_rgba(61,111,168,0.15)]">
+            <BoxHeading title="Tip" hint="Did the customer give a tip? Tap an amount (or None)." />
             <div className="flex gap-2 mb-3">
               {[0, 50, 100, 200].map((amount) => (
                 <button
@@ -689,10 +703,7 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
             <Segmented value={tipMode} onChange={setTipMode} label="Tip paid by" />
           </div>
 
-          <div>
-            <SectionLabel>Payment method</SectionLabel>
-            <Segmented value={paymentMode} onChange={setPaymentMode} label="Payment method" />
-          </div>
+          
 
           <div className={`bg-[var(--surface)] border border-[var(--border-subtle)] p-4 ${wizard ? "order-first" : ""}`}>
             <SectionLabel>Summary</SectionLabel>
@@ -798,8 +809,9 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
                 <ArrowLeft size={18} />
               </Button>
               <Button
-                variant="secondary"
                 size="lg"
+                className="border border-white/25 shadow-[0_2px_0_rgba(0,0,0,0.35)]"
+                style={{ background: "#B45309", color: "#fff" }}
                 onClick={() => {
                   setProducts([])
                   goTo("summary")
@@ -904,6 +916,16 @@ function MiddleEllipsis({ text, className = "" }: { text: string; className?: st
   )
 }
 
+/** A bold heading for a boxed part of the bill, with one line saying what to do. */
+function BoxHeading({ title, hint, good, needed }: { title: string; hint: string; good?: boolean; needed?: boolean }) {
+  return (
+    <div className="mb-3">
+      <div className="font-display text-lg font-800 uppercase tracking-wider text-[var(--text)]">{title}</div>
+      <div className={`mt-0.5 text-xs ${good ? "text-[#4CAF86]" : needed ? "text-[#F59E0B]" : "text-[var(--text-muted)]"}`}>{hint}</div>
+    </div>
+  )
+}
+
 function Segmented({
   value,
   onChange,
@@ -924,7 +946,9 @@ function Segmented({
           aria-label={mode === "gpay" ? "GPay" : "Cash"}
           className={`flex h-12 items-center justify-center border font-display font-700 uppercase tracking-wider text-xs ${
             value === mode
-              ? "bg-[var(--text)] text-[var(--bg)] border-[var(--text)]"
+              ? mode === "gpay"
+                ? "border-[#1A73E8] bg-[#1A73E8] text-white"
+                : "bg-[var(--text)] text-[var(--bg)] border-[var(--text)]"
               : "bg-[var(--elevated)] text-[var(--text-muted)] border-[var(--border)]"
           }`}
           onClick={() => onChange(mode)}

@@ -481,6 +481,30 @@ export const getGst = () => request<GstConfig>("GET", "/admin/gst")
 
 export const saveGst = (body: GstConfig) => request<GstConfig>("PUT", "/admin/gst", { body })
 
+/** One branch's GST: its switch, its rates and which services include GST in their price. */
+export interface BranchGstRow {
+  branchId: string
+  branchName: string
+  isActive: boolean
+  /** false while the branch follows the business defaults */
+  customised: boolean
+  enabled: boolean
+  servicesRate: number
+  productsRate: number
+  productsInclusive: boolean
+  inclusiveServiceIds: string[]
+}
+
+export const listBranchGst = () => request<{ data: BranchGstRow[] }>("GET", "/admin/gst/branches").then((r) => r.data)
+
+export const saveBranchGst = (
+  branchId: string,
+  body: Omit<BranchGstRow, "branchId" | "branchName" | "isActive" | "customised">,
+) => request<{ data: BranchGstRow }>("PUT", `/admin/gst/branches/${branchId}`, { body }).then((r) => r.data)
+
+export const resetBranchGst = (branchId: string) =>
+  request<{ data: BranchGstRow }>("DELETE", `/admin/gst/branches/${branchId}`).then((r) => r.data)
+
 export const listDiscounts = () =>
   request<{ data: BranchDiscountRow[] }>("GET", "/admin/discounts").then((r) => r.data)
 

@@ -7,6 +7,7 @@ import { categoryOf, CATEGORY_ORDER } from "../../../lib/menuOrder"
 import { formatMoney } from "../adminTypes"
 import { AdminPage, AsyncNotice, Field, PageHeading } from "../components"
 import { useAdminActions } from "../hooks/useAdminActions"
+import { GstBranches } from "./GstBranches"
 import { useUnsavedChanges } from "../hooks/useUnsavedChanges"
 
 /** What is typed: rates stay as text so a digit can be deleted without the box jumping to 0. */
@@ -108,7 +109,7 @@ export const GstView = () => {
       <PageHeading
         eyebrow="Tax"
         title="GST"
-        description="The GSTIN and rates printed on every bill. Each bill keeps the figures it was issued with, so changing these only affects new bills."
+        description="Your GSTIN and the business settings (used by every branch and as the starting point for new ones), then each branch's own switch, rates and services. Each bill keeps the figures it was issued with, so changes only affect new bills."
       />
       <AsyncNotice loading={loading && !data} error={error} onRetry={() => void reload()} />
       {draft && cfg && (
@@ -116,11 +117,11 @@ export const GstView = () => {
           <section className="admin-card p-5" aria-label="GST settings">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="font-display font-800 text-2xl uppercase tracking-wider">Tax invoices</div>
+                <div className="font-display font-800 text-2xl uppercase tracking-wider">Business settings</div>
                 <div className="mt-1 text-[11px] text-[var(--text-muted)]">
                   {draft.enabled
-                    ? "On: every closed bill is a GST tax invoice with its own invoice number."
-                    : "Off: bills are issued without GST and without an invoice number."}
+                    ? "On: closed bills are GST tax invoices with their own invoice number (each branch can still switch itself off below)."
+                    : "Off: no branch issues GST. Bills have no GST and no invoice number."}
                 </div>
               </div>
               <button
@@ -313,6 +314,7 @@ export const GstView = () => {
           </aside>
         </div>
       )}
+      {draft && <GstBranches groups={orderedGroups.map(([group, items]) => ({ group, items }))} />}
       {actions.feedback}
     </AdminPage>
   )

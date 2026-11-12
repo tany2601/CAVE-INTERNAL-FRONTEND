@@ -50,9 +50,9 @@ const emptyForm: BranchForm = {
   stylistPin: "",
 }
 
-/** A Google link over https (what the server accepts): g.page, goo.gl, search.google.com, google.com, … */
+/** A Google link over https, or a common short link to it (what the server accepts). */
 const isGoogleLink = (value: string) =>
-  /^https:\/\/(g\.page|g\.co|goo\.gl|maps\.app\.goo\.gl|share\.google|(?:[a-z0-9-]+\.)*google\.(?:com|co\.in|in))(\/|$)/i.test(value.trim())
+  /^https:\/\/(g\.page|g\.co|goo\.gl|maps\.app\.goo\.gl|share\.google|tinyurl\.com|bit\.ly|rb\.gy|cutt\.ly|(?:[a-z0-9-]+\.)*google\.(?:com|co\.in|in))(\/|$)/i.test(value.trim())
 
 const toCode = (name: string) =>
   name.toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 20)
@@ -385,7 +385,7 @@ export function BranchManagementView() {
                 }`}
               >
                 {editing.reviewUrl.trim() !== "" && !isGoogleLink(editing.reviewUrl)
-                  ? "This does not look like a Google review link. It starts with https://g.page/ or https://search.google.com/."
+                  ? "This does not look like a review link. Use the Google link (https://g.page/… or https://search.google.com/…) or a short link such as https://tinyurl.com/…"
                   : "Printed at the bottom of this branch's WhatsApp bills so customers can rate the visit."}
               </div>
             </div>
