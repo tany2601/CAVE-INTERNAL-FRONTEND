@@ -1,4 +1,4 @@
-import type { GstConfig } from "../gst"
+import type { GstConfig, GstMode } from "../gst"
 import { request, requestBlob } from "./http"
 import type {
   ApiProduct,
@@ -492,7 +492,8 @@ export interface BranchGstRow {
   servicesRate: number
   productsRate: number
   productsInclusive: boolean
-  inclusiveServiceIds: string[]
+  /** How GST works for each service at this branch; a service that is missing is "+ GST". */
+  serviceModes: Record<string, GstMode>
 }
 
 export const listBranchGst = () => request<{ data: BranchGstRow[] }>("GET", "/admin/gst/branches").then((r) => r.data)

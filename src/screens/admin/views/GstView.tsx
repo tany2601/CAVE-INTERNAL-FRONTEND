@@ -2,7 +2,8 @@ import { useEffect, useState } from "react"
 import { Receipt, Save } from "lucide-react"
 import { adminApi } from "../../../lib/api"
 import { useAsyncData } from "../../../hooks/useAsyncData"
-import { billGst, halfRate, isValidGstin, type GstConfig } from "../../../lib/gst"
+import { billGst, halfRate, isValidGstin, type GstConfig, type GstMode } from "../../../lib/gst"
+import { GstModeSelector } from "../components/GstModeSelector"
 import { categoryOf, CATEGORY_ORDER } from "../../../lib/menuOrder"
 import { formatMoney } from "../adminTypes"
 import { AdminPage, AsyncNotice, Field, PageHeading } from "../components"
@@ -16,8 +17,8 @@ interface Draft {
   gstin: string
   legalName: string
   servicesRate: string
-  /** The services (ids) whose menu price already includes the GST; all others have it added on top. */
-  inclusiveServiceIds: string[]
+  /** How GST works for each service (by id); a service not listed is + GST. */
+  serviceModes: Record<string, GstMode>
   productsRate: string
   productsInclusive: boolean
   servicesCode: string
@@ -29,7 +30,7 @@ const toDraft = (c: GstConfig): Draft => ({
   gstin: c.gstin,
   legalName: c.legalName,
   servicesRate: String(c.services.rate),
-  inclusiveServiceIds: c.inclusiveServiceIds,
+  serviceModes: { ...c.serviceModes },
   productsRate: String(c.products.rate),
   productsInclusive: c.products.inclusive,
   servicesCode: c.servicesCode,
@@ -43,7 +44,8 @@ const toConfig = (d: Draft): GstConfig => ({
   legalName: d.legalName.trim(),
   // A service that is not on the menu (a custom one) always has the GST added on top.
   services: { rate: num(d.servicesRate), inclusive: false },
-  inclusiveServiceIds: [...d.inclusiveServiceIds].sort(),
+  // Only what differs from the default (+ GST) is kept, so a service set back to + GST is not a change.
+  serviceModes: Object.fromEntries(Object.entries(d.serviceModes).filter(([, m]) => m !== "ADD_ON_TOP").sort(([a], [b]) => a.localeCompare(b))),
   products: { rate: num(d.productsRate), inclusive: d.productsInclusive },
   servicesCode: d.servicesCode.trim(),
   productsCode: d.productsCode.trim(),
@@ -82,11 +84,8 @@ export const GstView = () => {
   const valid = !!cfg && gstinOk && codeOk(cfg.servicesCode) && codeOk(cfg.productsCode)
 
   // A worked example from the figures on screen, so the effect of each choice is visible before saving.
-  const example = cfg ? billGst(cfg, { servicesInclusive: 300, servicesExclusive: 1200, products: 599 }) : null
-  const toggleService = (id: string) =>
-    setDraft((d) =>
-      d ? { ...d, inclusiveServiceIds: d.inclusiveServiceIds.includes(id) ? d.inclusiveServiceIds.filter((x) => x !== id) : [...d.inclusiveServiceIds, id] } : d,
-    )
+  const example = cfg ? billGst(cfg, { servicesInclusive: 300, servicesExclusive: 1200, servicesExempt: 150, products: 599 }) : null
+  const setMode = (id: string, mode: GstMode) => setDraft((d) => (d ? { ...d, serviceModes: { ...d.serviceModes, [id]: mode } } : d))
   // The menu grouped like the billing screen: Hair, Beard, Skin, Combo, then the rest.
   const groups = new Map<string, { id: string; name: string }[]>()
   for (const svc of data?.services ?? []) {
@@ -229,36 +228,23 @@ export const GstView = () => {
             </div>
 
             <div className="mt-5 rounded-xl border border-[var(--border-subtle)] p-4">
-              <div className="admin-kicker">Which services include GST in their price</div>
+              <div className="admin-kicker">How GST works for each service</div>
               <p className="mt-1 text-[11px] leading-relaxed text-[var(--text-muted)]">
-                Switched on: the customer pays the menu price and the GST is taken out of it. Switched off: the GST is added on top of the menu
-                price. Haircuts and beard start switched on.
+                <strong>+ GST</strong>: GST is added on top of the menu price. <strong>Incl. GST</strong>: the customer pays the menu price and the GST is
+                taken out of it. <strong>No GST</strong>: no GST is charged and the price is not counted as taxable. Haircuts and beard start as Incl. GST;
+                these settings are what every branch starts with.
               </p>
-              <div className="mt-3 grid gap-4 md:grid-cols-2">
+              <div className="mt-3 grid gap-4">
                 {orderedGroups.map(([group, items]) => (
                   <div key={group}>
                     <div className="mb-1 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">{group}</div>
                     <ul className="divide-y divide-[var(--border-subtle)] border-y border-[var(--border-subtle)]">
-                      {items.map((svc) => {
-                        const on = draft.inclusiveServiceIds.includes(svc.id)
-                        return (
-                          <li key={svc.id} className="flex items-center justify-between gap-3 py-2">
-                            <span className="min-w-0 text-sm">{svc.name}</span>
-                            <button
-                              type="button"
-                              role="switch"
-                              aria-checked={on}
-                              aria-label={`${svc.name}: GST ${on ? "included in the price" : "added on top"}`}
-                              className={`relative h-7 w-12 shrink-0 rounded-full border transition-colors ${
-                                on ? "border-[#3D6FA8] bg-[#3D6FA8]" : "border-[var(--border)] bg-[var(--elevated)]"
-                              }`}
-                              onClick={() => toggleService(svc.id)}
-                            >
-                              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${on ? "left-6" : "left-0.5"}`} />
-                            </button>
-                          </li>
-                        )
-                      })}
+                      {items.map((svc) => (
+                        <li key={svc.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 py-2">
+                          <span className="min-w-0 text-sm">{svc.name}</span>
+                          <GstModeSelector name={svc.name} value={draft.serviceModes[svc.id] ?? "ADD_ON_TOP"} onChange={(m) => setMode(svc.id, m)} />
+                        </li>
+                      ))}
                     </ul>
                   </div>
                 ))}
@@ -273,7 +259,7 @@ export const GstView = () => {
                 actions.request({
                   title: "Save the GST settings?",
                   message: cfg.enabled
-                    ? `New bills will carry GSTIN ${cfg.gstin}: services ${cfg.services.rate}% (included in the price for ${cfg.inclusiveServiceIds.length} service${cfg.inclusiveServiceIds.length === 1 ? "" : "s"}, added on top for the rest), products ${cfg.products.rate}% (${cfg.products.inclusive ? "included in" : "added to"} the price). Bills already issued do not change.`
+                    ? `New bills will carry GSTIN ${cfg.gstin}: services ${cfg.services.rate}% (set per service: + GST, Incl. GST or No GST), products ${cfg.products.rate}% (${cfg.products.inclusive ? "included in" : "added to"} the price). Bills already issued do not change.`
                     : "New bills will be issued without GST. Bills already issued do not change.",
                   confirmLabel: "Save",
                   action: save,
@@ -289,13 +275,18 @@ export const GstView = () => {
             <div className="flex items-center gap-2 font-display text-lg font-700 uppercase tracking-wider">
               <Receipt size={17} /> Example
             </div>
-            <p className="mt-1 text-[11px] text-[var(--text-muted)]">A haircut at ₹300 (GST in the price), a ₹1,200 facial (GST on top) and a ₹599 product, no discount.</p>
+            <p className="mt-1 text-[11px] text-[var(--text-muted)]">A haircut at ₹300 (Incl. GST), a ₹1,200 facial (+ GST), a ₹150 service with No GST and a ₹599 product, no discount.</p>
             {example && cfg.enabled ? (
               <dl className="mt-4 grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 text-sm [font-variant-numeric:tabular-nums]">
                 <dt className="admin-kicker col-span-2 mt-1">Services</dt>
                 <dt>Taxable value</dt><dd>{formatMoney(example.services.taxable)}</dd>
                 <dt>CGST @ {halfRate(example.services.rate)}%</dt><dd>{formatMoney(example.services.cgst)}</dd>
                 <dt>SGST @ {halfRate(example.services.rate)}%</dt><dd>{formatMoney(example.services.sgst)}</dd>
+                {example.services.exempt > 0 && (
+                  <>
+                    <dt>Non-GST services (no GST)</dt><dd>{formatMoney(example.services.exempt)}</dd>
+                  </>
+                )}
                 <dt className="font-600">Customer pays</dt><dd className="font-600">{formatMoney(example.services.payable)}</dd>
                 <dt className="admin-kicker col-span-2 mt-3">Products</dt>
                 <dt>Taxable value</dt><dd>{formatMoney(example.products.taxable)}</dd>

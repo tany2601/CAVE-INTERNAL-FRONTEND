@@ -149,6 +149,8 @@ export interface ApiGstPart {
   taxable: number
   cgst: number
   sgst: number
+  /** Services only: what was charged on services with No GST (not part of the taxable value). */
+  exempt?: number
 }
 
 /** The GST on a tax invoice, as saved with the bill. */
@@ -157,6 +159,8 @@ export interface ApiSessionGst {
   products: ApiGstPart
   /** The services whose price included the GST on this bill (the rest had it added on top). */
   inclusiveServiceIds: string[]
+  /** The services that had no GST on this bill. */
+  exemptServiceIds?: string[]
   taxable: number
   cgst: number
   sgst: number

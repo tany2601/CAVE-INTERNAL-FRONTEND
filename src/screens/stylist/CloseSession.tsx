@@ -3,7 +3,7 @@ import { Session, Service } from "../../types"
 import { Button, SectionLabel, AmountRow, Select, ServiceColorTile, PhoneInput, HScroller, QtyStepper, PayLabel, QuickSteps } from "../../components/ui"
 import { isValidPhone, sanitizePhone } from "../../lib/phone"
 import { billNo, billText, invoiceOf, whatsappLink } from "../../lib/billText"
-import { billGst, serviceNets, type GstConfig } from "../../lib/gst"
+import { billGst, modeOfService, serviceBuckets, type GstConfig, type GstMode } from "../../lib/gst"
 import { assignServiceColors } from "../../lib/serviceColors"
 import { formatAmount } from "../../lib/format"
 import { round2, sumMoney } from "../../lib/money"
@@ -198,18 +198,28 @@ export default function CloseSession({ session, onComplete, onCancel, productOnl
       ? { services: session.gst.services, products: session.gst.products }
       : null
     : gstConfig
-  // Services whose price includes GST (haircuts and beard unless the admin chose otherwise) and the rest, which
-  // have it added on top, share the services discount in proportion (same rule as the server).
-  const inclusiveIds = (editing ? session.gst?.inclusiveServiceIds : gstConfig?.inclusiveServiceIds) ?? []
+  // Each service has its own GST mode: price includes GST, GST on top, or No GST. The services discount is shared
+  // between the three kinds in proportion (same rule as the server). A bill being corrected keeps its own modes.
+  const modes: Record<string, GstMode> = editing
+    ? {
+        ...Object.fromEntries((session.gst?.inclusiveServiceIds ?? []).map((id) => [id, "INCLUDED_IN_PRICE"])),
+        ...Object.fromEntries((session.gst?.exemptServiceIds ?? []).map((id) => [id, "NO_GST"])),
+      }
+    : (gstConfig?.serviceModes ?? {})
   const serviceIdOf = new Map(SERVICES.map((s) => [s.id, s.serviceId]))
-  const includesGst = (s: Service) => {
-    const serviceId = serviceIdOf.get(s.id)
-    return serviceId ? inclusiveIds.includes(serviceId) : (gstTerms?.services.inclusive ?? false)
-  }
-  const inclusiveGross = sumMoney(billServices.filter(includesGst).map((s) => s.price))
-  const nets = serviceNets(inclusiveGross, round2(serviceTotal - inclusiveGross), serviceDiscountAmount)
+  const grossOf = (mode: GstMode) =>
+    sumMoney(billServices.filter((s) => modeOfService(modes, serviceIdOf.get(s.id)) === mode).map((s) => s.price))
+  const nets = serviceBuckets(
+    { inclusive: grossOf("INCLUDED_IN_PRICE"), exclusive: grossOf("ADD_ON_TOP"), exempt: grossOf("NO_GST") },
+    serviceDiscountAmount,
+  )
   const gst = gstTerms
-    ? billGst(gstTerms, { servicesInclusive: nets.inclusive, servicesExclusive: nets.exclusive, products: productsNet })
+    ? billGst(gstTerms, {
+        servicesInclusive: nets.inclusive,
+        servicesExclusive: nets.exclusive,
+        servicesExempt: nets.exempt,
+        products: productsNet,
+      })
     : null
   const total = Math.max(0, round2((gst ? gst.payable : servicesNet + productsNet) + tip))
   // What is sent for each part: a percentage as typed (at most 100), or the rupees actually taken off.

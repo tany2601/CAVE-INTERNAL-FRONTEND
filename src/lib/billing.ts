@@ -43,6 +43,8 @@ export interface GstRowPart {
   taxable: number
   cgst: number
   sgst: number
+  /** Services only: charged with no GST, so not in the taxable value. */
+  exempt?: number
 }
 
 /** The tax lines of a bill, in the order they are printed: for services, then products. */
@@ -56,13 +58,18 @@ export function gstRows(
     ["products", "Products"],
   ] as const) {
     const part = gst[key]
-    if (part.taxable <= 0 && part.cgst <= 0) continue
-    const half = halfRate(part.rate)
-    const note = part.inclusive ? " (incl.)" : ""
-    const code = codes[key] ? ` (${codes[key]})` : ""
-    rows.push({ label: `${name} taxable value${code}`, amount: part.taxable, tax: false })
-    rows.push({ label: `CGST @ ${half}%${note}`, amount: part.cgst, tax: true })
-    rows.push({ label: `SGST @ ${half}%${note}`, amount: part.sgst, tax: true })
+    if (part.taxable > 0 || part.cgst > 0) {
+      const half = halfRate(part.rate)
+      const note = part.inclusive ? " (incl.)" : ""
+      const code = codes[key] ? ` (${codes[key]})` : ""
+      rows.push({ label: `${name} taxable value${code}`, amount: part.taxable, tax: false })
+      rows.push({ label: `CGST @ ${half}%${note}`, amount: part.cgst, tax: true })
+      rows.push({ label: `SGST @ ${half}%${note}`, amount: part.sgst, tax: true })
+    }
+    // Services with No GST get their own line, so it is clear why no GST was charged on them.
+    if ((part.exempt ?? 0) > 0) {
+      rows.push({ label: `Non-GST ${name.toLowerCase()} (no GST charged)`, amount: part.exempt ?? 0, tax: false })
+    }
   }
   return rows
 }

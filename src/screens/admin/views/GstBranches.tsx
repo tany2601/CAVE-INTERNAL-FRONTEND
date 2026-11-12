@@ -3,7 +3,8 @@ import { RotateCcw, Save } from "lucide-react"
 import { adminApi } from "../../../lib/api"
 import type { BranchGstRow } from "../../../lib/api/admin"
 import { useAsyncData } from "../../../hooks/useAsyncData"
-import { halfRate } from "../../../lib/gst"
+import { halfRate, type GstMode } from "../../../lib/gst"
+import { GstModeSelector } from "../components/GstModeSelector"
 import { AdminSelect, AsyncNotice, Field } from "../components"
 import { useAdminActions } from "../hooks/useAdminActions"
 import { useUnsavedChanges } from "../hooks/useUnsavedChanges"
@@ -19,7 +20,7 @@ interface Draft {
   servicesRate: string
   productsRate: string
   productsInclusive: boolean
-  inclusiveServiceIds: string[]
+  serviceModes: Record<string, GstMode>
 }
 
 const toDraft = (r: BranchGstRow): Draft => ({
@@ -27,11 +28,11 @@ const toDraft = (r: BranchGstRow): Draft => ({
   servicesRate: String(r.servicesRate),
   productsRate: String(r.productsRate),
   productsInclusive: r.productsInclusive,
-  inclusiveServiceIds: r.inclusiveServiceIds,
+  serviceModes: { ...r.serviceModes },
 })
 const num = (v: string) => (Number.isFinite(Number(v)) ? Number(v) : 0)
 const normal = (d: Draft) =>
-  JSON.stringify({ ...d, servicesRate: num(d.servicesRate), productsRate: num(d.productsRate), inclusiveServiceIds: [...d.inclusiveServiceIds].sort() })
+  JSON.stringify({ ...d, servicesRate: num(d.servicesRate), productsRate: num(d.productsRate), serviceModes: Object.fromEntries(Object.entries(d.serviceModes).filter(([, m]) => m !== "ADD_ON_TOP").sort(([a], [b]) => a.localeCompare(b))) })
 const rateText = (text: string) => {
   let t = text.replace(/[^\d.]/g, "")
   const dot = t.indexOf(".")
@@ -95,10 +96,7 @@ export function GstBranches({ groups }: { groups: ServiceGroup[] }) {
   useUnsavedChanges(dirty)
 
   const set = (patch: Partial<Draft>) => row && setDrafts((c) => ({ ...c, [row.branchId]: { ...(c[row.branchId] ?? toDraft(row)), ...patch } }))
-  const toggleService = (serviceId: string) => {
-    if (!d) return
-    set({ inclusiveServiceIds: d.inclusiveServiceIds.includes(serviceId) ? d.inclusiveServiceIds.filter((x) => x !== serviceId) : [...d.inclusiveServiceIds, serviceId] })
-  }
+  const setMode = (serviceId: string, mode: GstMode) => d && set({ serviceModes: { ...d.serviceModes, [serviceId]: mode } })
 
   /** Switching branch with edits not saved asks first, so nothing is lost by accident. */
   const pick = (name: string) => {
@@ -124,7 +122,8 @@ export function GstBranches({ groups }: { groups: ServiceGroup[] }) {
       servicesRate: num(d.servicesRate),
       productsRate: num(d.productsRate),
       productsInclusive: d.productsInclusive,
-      inclusiveServiceIds: d.inclusiveServiceIds,
+      // Every service is sent with its mode (a service not touched is + GST)
+      serviceModes: Object.fromEntries(groups.flatMap((g) => g.items.map((svc) => [svc.id, d.serviceModes[svc.id] ?? "ADD_ON_TOP"]))),
     })
     await reload()
   }
@@ -216,29 +215,22 @@ export function GstBranches({ groups }: { groups: ServiceGroup[] }) {
               </div>
 
               <div>
-                <div className="admin-kicker">Services with GST inside the price</div>
+                <div className="admin-kicker">How GST works for each service</div>
                 <p className="mt-1 text-[11px] leading-relaxed text-[var(--text-muted)]">
-                  On: the customer pays the menu price and the GST is taken out of it. Off: the GST is added on top.
+                  <strong>+ GST</strong>: added on top of the menu price. <strong>Incl. GST</strong>: inside the menu price. <strong>No GST</strong>: no GST charged and
+                  not counted as taxable.
                 </p>
-                <div className="mt-2 grid gap-4 sm:grid-cols-2">
+                <div className="mt-2 grid gap-4">
                   {groups.map(({ group, items }) => (
                     <div key={group}>
                       <div className="mb-1 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">{group}</div>
                       <ul className="divide-y divide-[var(--border-subtle)] border-y border-[var(--border-subtle)]">
-                        {items.map((svc) => {
-                          const on = d.inclusiveServiceIds.includes(svc.id)
-                          return (
-                            <li key={svc.id} className="flex items-center justify-between gap-3 py-2">
-                              <span className="min-w-0 text-sm">{svc.name}</span>
-                              <Switch
-                                small
-                                on={on}
-                                label={`${row.branchName} · ${svc.name}: GST ${on ? "included in the price" : "added on top"}`}
-                                onClick={() => toggleService(svc.id)}
-                              />
-                            </li>
-                          )
-                        })}
+                        {items.map((svc) => (
+                          <li key={svc.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 py-2">
+                            <span className="min-w-0 text-sm">{svc.name}</span>
+                            <GstModeSelector name={`${row.branchName} · ${svc.name}`} value={d.serviceModes[svc.id] ?? "ADD_ON_TOP"} onChange={(m) => setMode(svc.id, m)} />
+                          </li>
+                        ))}
                       </ul>
                     </div>
                   ))}

@@ -24,8 +24,14 @@ All maths is in whole paise. CGST always equals SGST (a salon sale is intra-stat
 | Rate (default) | 5% = CGST 2.5% + SGST 2.5% | 18% = CGST 9% + SGST 9% |
 | Prices | Haircuts and beard services: GST **included** in the menu price. Every other service, and custom services: GST **added on top** | GST **added on top** of the product price |
 
-Which services include GST in their price is set per service in Admin → GST (a switch beside each service). The
-services discount is shared between the two kinds in proportion, to the paisa.
+Each service has one of three modes, set per branch in Admin → GST (a selector beside each service):
+
+- **+ GST** (ADD_ON_TOP): GST is added on top of the menu price.
+- **Incl. GST** (INCLUDED_IN_PRICE): the customer pays the menu price and the GST is taken out of it.
+- **No GST** (NO_GST): no GST is charged. The price is not part of any taxable value; the bill shows it on its own line
+  ("Non-GST services (no GST charged)") so it is clear why no GST was charged.
+
+The services discount is shared between the three kinds in proportion, to the paisa.
 - **Added on top:** taxable value = amount after discount; each half = taxable × half the rate, rounded to the nearest
   paisa; the customer pays taxable + CGST + SGST. Example: ₹300 → ₹7.50 + ₹7.50 → ₹315.
 - **Included:** the customer pays exactly the price. Each half = half the exact tax, rounded to the nearest paisa,
