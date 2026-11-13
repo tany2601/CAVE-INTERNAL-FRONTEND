@@ -25,9 +25,30 @@ export const lookupCustomer = (phone: string) =>
     query: { phone },
   })
 
+/** The same lookup for a customer picked from the suggestions (the full number is never sent to the app). */
+export const lookupCustomerById = (customerId: string) =>
+  request<CustomerLookupResponse>("GET", "/staff/customers/lookup", {
+    query: { customerId },
+  })
+
+/** One returning customer with this name: an id, and the number with its middle hidden (98*****345). */
+export interface CustomerSuggestion {
+  id: string
+  maskedPhone: string
+  visits: number
+}
+
+/** Customers with exactly this name whose number starts with the digits typed so far. */
+export const suggestCustomers = (name: string, digits: string) =>
+  request<{ data: CustomerSuggestion[]; more?: boolean }>("GET", "/staff/customers/suggest", {
+    query: { name, digits },
+  })
+
 export const createSession = (body: {
   customerName: string
   customerMobile?: string
+  /** A returning customer picked from the suggestions: the server uses their saved name and number. */
+  customerId?: string
   stylistId?: string
   /** Menu items (servicePricingIds) picked at check-in; pre-selected at billing. */
   serviceIds?: string[]

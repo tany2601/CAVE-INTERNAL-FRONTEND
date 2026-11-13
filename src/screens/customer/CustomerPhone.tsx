@@ -1,12 +1,15 @@
 import { useState } from "react"
 import { useKeyboardStable } from "../../hooks/useKeyboardStable"
-import { Button, PhoneInput, ScreenBackdrop, BACKDROPS } from "../../components/ui"
+import { Button, NumberSuggestions, PhoneInput, ScreenBackdrop, BACKDROPS } from "../../components/ui"
+import { useCustomerSuggestions } from "../../hooks/useCustomerSuggestions"
+import type { CustomerSuggestion } from "../../lib/api/staff"
 import { isValidPhone, phoneError } from "../../lib/phone"
-import { MessageCircle } from "lucide-react"
+import { Check, MessageCircle } from "lucide-react"
 
 interface Props {
   customerName: string
-  onContinue: (phone?: string) => void
+  /** A typed number, or (for a number picked from the saved list) just the customer's id. */
+  onContinue: (phone?: string, customerId?: string) => void
   onBack: () => void
 }
 
@@ -18,6 +21,9 @@ export default function CustomerPhone({
   useKeyboardStable()
   const [phone, setPhone] = useState("")
   const [skipWarn, setSkipWarn] = useState(false)
+  /** A saved number the customer tapped in the list (only its masked form is known here). */
+  const [picked, setPicked] = useState<CustomerSuggestion | null>(null)
+  const suggestions = useCustomerSuggestions(customerName, phone, !picked && !isValidPhone(phone))
 
   const handleSkip = () => {
     if (!skipWarn) {
@@ -61,6 +67,17 @@ export default function CustomerPhone({
 
           {/* Phone input */}
           <div className="flex flex-col gap-2">
+            {picked ? (
+              <div className="flex items-center gap-3 border-b-2 border-[#2E7D58] pb-3">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#2E7D58] text-white">
+                  <Check size={15} strokeWidth={3} />
+                </span>
+                <span className="min-w-0 flex-1 font-display text-3xl font-500 tracking-wide text-[var(--text)]">+91 {picked.maskedPhone}</span>
+                <button type="button" className="shrink-0 px-2 py-2 text-sm underline text-[var(--text-secondary)]" onClick={() => setPicked(null)}>
+                  Change
+                </button>
+              </div>
+            ) : (
             <div className="flex items-end gap-3 border-b-2 border-[var(--border-subtle)] focus-within:border-[var(--text)] transition-colors pb-2">
               <span className="text-[var(--text-muted)] text-xl font-display">
                 +91
@@ -75,13 +92,19 @@ export default function CustomerPhone({
                 showError={false}
               />
             </div>
-            <div
-              className={`text-[10px] ${
-                phoneError(phone) ? "text-[#E06060]" : "text-[var(--text-faint)]"
-              }`}
-            >
-              {phoneError(phone) ?? `${phone.length}/10 digits`}
-            </div>
+            )}
+            {!picked && (
+              <div
+                className={`text-[10px] ${
+                  phoneError(phone) ? "text-[#E06060]" : "text-[var(--text-faint)]"
+                }`}
+              >
+                {phoneError(phone) ?? `${phone.length}/10 digits`}
+              </div>
+            )}
+            {!picked && (
+              <NumberSuggestions items={suggestions.items} more={suggestions.more} onPick={(c) => { setPicked(c); setPhone("") }} className="mt-1" />
+            )}
           </div>
 
           {/* WhatsApp indicator (below the field so the field sits higher, clear of the keyboard) */}
@@ -106,8 +129,8 @@ export default function CustomerPhone({
             variant="primary"
             fullWidth
             size="lg"
-            disabled={!isValidPhone(phone)}
-            onClick={() => onContinue("+91 " + phone)}
+            disabled={!picked && !isValidPhone(phone)}
+            onClick={() => (picked ? onContinue(undefined, picked.id) : onContinue("+91 " + phone))}
           >
             Continue
           </Button>

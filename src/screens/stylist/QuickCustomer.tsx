@@ -1,15 +1,19 @@
 import { useEffect, useState } from "react"
-import { X } from "lucide-react"
-import { Button, PhoneInput, QuickSteps } from "../../components/ui"
+import { Check, X } from "lucide-react"
+import { Button, NumberSuggestions, PhoneInput, QuickSteps } from "../../components/ui"
+import { useCustomerSuggestions } from "../../hooks/useCustomerSuggestions"
+import type { CustomerSuggestion } from "../../lib/api/staff"
 import { useBranchData } from "../../context/BranchDataContext"
 import { staffApi } from "../../lib/api"
-import { isValidPersonName, sanitizePersonName } from "../../lib/names"
+import { capitalizeName, isValidPersonName, sanitizePersonName } from "../../lib/names"
 import { isValidPhone } from "../../lib/phone"
 import { useKeyboardStable } from "../../hooks/useKeyboardStable"
 
 export interface QuickCustomerDetails {
   name: string
   phone?: string
+  /** A returning customer picked from the suggestions: the server uses their saved number. */
+  customerId?: string
   stylistId: string
 }
 
@@ -35,6 +39,9 @@ export default function QuickCustomer({
   const [noNumber, setNoNumber] = useState(false)
   const [stylistId, setStylistId] = useState("")
   const [returning, setReturning] = useState<{ visits: number } | null>(null)
+  /** A saved number the person tapped in the list (only its masked form is known here). */
+  const [picked, setPicked] = useState<CustomerSuggestion | null>(null)
+  const suggestions = useCustomerSuggestions(name, phone, !picked && !noNumber && !isValidPhone(phone))
 
   // A number we already know: fill in the name and say it is a returning customer.
   useEffect(() => {
@@ -55,7 +62,7 @@ export default function QuickCustomer({
   }, [phone])
 
   const nameOk = isValidPersonName(name, 2)
-  const phoneOk = isValidPhone(phone) || noNumber
+  const phoneOk = isValidPhone(phone) || noNumber || !!picked
   const ready = nameOk && phoneOk && !!stylistId
   const missing = !nameOk
     ? "Type the customer's name."
@@ -89,24 +96,58 @@ export default function QuickCustomer({
               autoComplete="off"
               autoFocus
               value={name}
-              onChange={(e) => setName(sanitizePersonName(e.target.value))}
+              onChange={(e) => {
+                setName(capitalizeName(sanitizePersonName(e.target.value)))
+                setPicked(null) // a different name is a different customer: pick the number again
+              }}
             />
           </label>
 
           <div className="flex flex-col gap-2">
             <span className="text-sm font-600 text-[var(--text)]">Mobile number</span>
-            <PhoneInput
-              value={phone}
-              onChange={(v) => {
-                setPhone(v)
-                if (v) setNoNumber(false)
-              }}
-              className="h-14 w-full border border-[var(--border)] bg-[var(--surface)] px-4 text-lg text-[var(--text)] outline-none"
-            />
+            {picked ? (
+              <div className="flex min-h-14 items-center gap-3 border-2 border-[#15803D] bg-[var(--surface)] px-4 py-2">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#15803D] text-white">
+                  <Check size={15} strokeWidth={3} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block font-display text-xl font-600 tracking-[0.12em] text-[var(--text)]">+91 {picked.maskedPhone}</span>
+                  <span className="block text-[11px] text-[var(--text-muted)]">Saved number chosen</span>
+                </span>
+                <button type="button" className="shrink-0 px-2 py-2 text-sm font-600 text-[var(--link,#7db7f0)] underline" onClick={() => setPicked(null)}>
+                  Change
+                </button>
+              </div>
+            ) : (
+              <>
+                <PhoneInput
+                  value={phone}
+                  onChange={(v) => {
+                    setPhone(v)
+                    if (v) setNoNumber(false)
+                  }}
+                  className="h-14 w-full border border-[var(--border)] bg-[var(--surface)] px-4 text-lg text-[var(--text)] outline-none"
+                />
+                <NumberSuggestions
+                  items={suggestions.items}
+                  more={suggestions.more}
+                  onPick={(c) => {
+                    setPicked(c)
+                    setPhone("")
+                    setNoNumber(false)
+                  }}
+                />
+              </>
+            )}
             <div className="text-xs leading-relaxed text-[var(--text-muted)]">
               The bill is sent to this number on WhatsApp, and it counts the customer's visits towards a free haircut.
             </div>
-            {returning && (
+            {picked && picked.visits > 0 && (
+              <div role="status" className="border border-[#4CAF86]/40 bg-[#4CAF86]/10 px-3 py-2 text-sm text-[var(--text)]">
+                Welcome back. This customer has visited {picked.visits} time{picked.visits === 1 ? "" : "s"} before.
+              </div>
+            )}
+            {!picked && returning && (
               <div role="status" className="border border-[#4CAF86]/40 bg-[#4CAF86]/10 px-3 py-2 text-sm text-[var(--text)]">
                 Welcome back. This customer has visited {returning.visits} time{returning.visits === 1 ? "" : "s"} before.
               </div>
@@ -119,6 +160,7 @@ export default function QuickCustomer({
               onClick={() => {
                 setNoNumber((v) => !v)
                 setPhone("")
+                setPicked(null)
               }}
             >
               {noNumber ? "✓ No mobile number for this customer (tap to undo)" : "Customer does not want to give a number"}
@@ -157,7 +199,9 @@ export default function QuickCustomer({
             fullWidth
             size="lg"
             disabled={!ready || busy}
-            onClick={() => onNext({ name: name.trim(), phone: phone || undefined, stylistId })}
+            onClick={() =>
+              onNext({ name: name.trim(), phone: picked ? undefined : phone || undefined, customerId: picked?.id, stylistId })
+            }
           >
             {busy ? "Please wait…" : "Next: choose services →"}
           </Button>

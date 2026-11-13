@@ -10,7 +10,7 @@ import {
 } from "lucide-react"
 import { Session } from "../../types"
 import { formatDuration } from "../../lib/format"
-import { BrandLogo } from "../../components/ui"
+import { BackgroundVideo, BrandLogo } from "../../components/ui"
 import { useBranchData } from "../../context/BranchDataContext"
 
 interface Props {
@@ -39,13 +39,7 @@ export default function Welcome({
 
   return (
     <div className="flex flex-col min-h-full relative overflow-hidden animate-fade-in bg-[var(--bg)]">
-      <div
-        className="absolute inset-0 z-0 bg-cover bg-center"
-        style={{
-          backgroundImage:
-            "url(/images/photos/1599351431202-1e0f0137899a.jpg)",
-        }}
-      />
+      <BackgroundVideo className="z-0" src="/brand/video.mp4" poster="/images/photos/1599351431202-1e0f0137899a.jpg" />
       <div
         className="absolute inset-0 z-1"
         style={{

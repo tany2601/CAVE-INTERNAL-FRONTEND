@@ -26,6 +26,8 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return // photos, fonts: leave to the network/browser cache
   if (url.pathname.startsWith("/api/")) return // never cache data
   if (url.pathname === "/version.json" || url.pathname === "/sw.js") return // always straight from the network
+  // Video is streamed in pieces (range requests) straight from the network: a cached partial answer would break it.
+  if (req.headers.has("range") || /\.(mp4|webm)$/i.test(url.pathname)) return
   // The public legal pages are plain HTML pages, not part of the app: never cache them as the app shell.
   if (/^\/(privacypolicy|termsofservice|datadeletion)(\/|\.html)?$/.test(url.pathname)) return
 

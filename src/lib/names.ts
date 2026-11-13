@@ -14,3 +14,8 @@ export function isValidPersonName(value: string, min = 3): boolean {
   const name = value.trim()
   return /^\p{L}/u.test(name) && (name.match(/\p{L}/gu)?.length ?? 0) >= min
 }
+
+/** "ravi kumar" -> "Ravi Kumar": the first letter of every word is a capital, other letters stay as typed. */
+export function capitalizeName(value: string): string {
+  return value.replace(/(^|\s)(\p{L})/gu, (_, before: string, letter: string) => before + letter.toUpperCase())
+}

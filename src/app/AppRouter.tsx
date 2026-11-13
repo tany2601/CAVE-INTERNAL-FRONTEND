@@ -182,6 +182,8 @@ function AppScreens({ onScreen }: { onScreen: (screen: string) => void }) {
   const [currentCustomer, setCurrentCustomer] = useState<Customer | null>(null)
   const [customerName, setCustomerName] = useState("")
   const [customerPhone, setCustomerPhone] = useState<string | undefined>()
+  /** A returning customer picked from the saved numbers (instead of typing the number). */
+  const [customerPickedId, setCustomerPickedId] = useState<string | undefined>()
   const [pickedServices, setPickedServices] = useState<string[]>([])
   const [closingSession, setClosingSession] = useState<Session | null>(null)
   const [editingSession, setEditingSession] = useState<Session | null>(null)
@@ -302,7 +304,7 @@ function AppScreens({ onScreen }: { onScreen: (screen: string) => void }) {
     nav("close-session")
   }
 
-  const lookupLoyalty = async (name: string, phone?: string): Promise<Customer> => {
+  const lookupLoyalty = async (name: string, phone?: string, customerId?: string): Promise<Customer> => {
     const blank: Customer = {
       name,
       phone,
@@ -310,9 +312,9 @@ function AppScreens({ onScreen }: { onScreen: (screen: string) => void }) {
       loyaltyTarget: 6,
       rewardReady: false,
     }
-    if (!phone) return blank
+    if (!phone && !customerId) return blank
     try {
-      const res = await staffApi.lookupCustomer(phone.replace(/\s+/g, ""))
+      const res = customerId ? await staffApi.lookupCustomerById(customerId) : await staffApi.lookupCustomer((phone ?? "").replace(/\s+/g, ""))
       return {
         ...blank,
         visitCount: res.visitCount,
@@ -333,7 +335,8 @@ function AppScreens({ onScreen }: { onScreen: (screen: string) => void }) {
       // the new session is shown locally and the dashboards catch up in the background.
       const created = await staffApi.createSession({
         customerName,
-        customerMobile: customerPhone?.replace(/\s+/g, ""),
+        customerMobile: customerPickedId ? undefined : customerPhone?.replace(/\s+/g, ""),
+        customerId: customerPickedId,
         stylistId: stylist.id,
         serviceIds: pickedServices.length ? pickedServices : undefined,
         startNow: true,
@@ -495,6 +498,7 @@ function AppScreens({ onScreen }: { onScreen: (screen: string) => void }) {
             const { session: created, reused } = await staffApi.startOrReuseSession({
               customerName: details.name,
               customerMobile: details.phone,
+              customerId: details.customerId,
               stylistId: details.stylistId,
               startNow: true,
             })
@@ -531,10 +535,11 @@ function AppScreens({ onScreen }: { onScreen: (screen: string) => void }) {
     return (
       <CustomerPhone
         customerName={customerName}
-        onContinue={async (phone) => {
+        onContinue={async (phone, customerId) => {
           setCustomerPhone(phone)
+          setCustomerPickedId(customerId)
           setStartError(null)
-          setCurrentCustomer(await lookupLoyalty(customerName, phone))
+          setCurrentCustomer(await lookupLoyalty(customerName, phone, customerId))
           // The "what are you here for?" step is switched off (felt long for customers).
           // To bring it back: use nav("customer-services") here, restore the block below,
           // and see the steps notes in CustomerName.tsx / CustomerPhone.tsx.
@@ -575,6 +580,7 @@ function AppScreens({ onScreen }: { onScreen: (screen: string) => void }) {
           // Nothing has been saved yet (the session starts at stylist selection), so just reset.
           setCustomerName("")
           setCustomerPhone(undefined)
+          setCustomerPickedId(undefined)
           setCurrentCustomer(null)
           setPickedServices([])
           nav("welcome")

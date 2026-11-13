@@ -1,4 +1,4 @@
-# CAVE Saloon · Frontend
+# CAVE Salon · Frontend
 
 React 19 + Vite + Tailwind CSS v4 PWA-style tablet app for the CAVE salon network.
 Three experiences share one codebase: **stylist / customer check-in**, **manager** and **admin**.

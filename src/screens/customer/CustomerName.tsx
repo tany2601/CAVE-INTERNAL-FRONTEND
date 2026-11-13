@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { useKeyboardStable } from "../../hooks/useKeyboardStable"
 import { Button, ScreenBackdrop, BACKDROPS } from "../../components/ui"
-import { isValidPersonName, sanitizePersonName } from "../../lib/names"
+import { capitalizeName, isValidPersonName, sanitizePersonName } from "../../lib/names"
 
 const MIN_NAME_LENGTH = 3
 
@@ -61,7 +61,7 @@ export default function CustomerName({ onContinue, onBack }: Props) {
               placeholder="Enter your name"
               value={name}
               onChange={(e) => {
-                const next = sanitizePersonName(e.target.value)
+                const next = capitalizeName(sanitizePersonName(e.target.value))
                 setName(next)
                 if (isValidPersonName(next, MIN_NAME_LENGTH)) setShowError(false)
               }}
